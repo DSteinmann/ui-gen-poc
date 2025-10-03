@@ -1,0 +1,34 @@
+{
+  "name": "end-device",
+  "capabilities": {
+    "button": {
+      "props": {
+        "label": "string",
+        "action": "object"
+      }
+    },
+    "toggle": {
+      "props": {
+        "label": "string",
+        "checked": "boolean",
+        "action": "object"
+      }
+    },
+    "text": {
+      "props": {
+        "content": "string"
+      }
+    },
+    "input": {
+      "props": {
+        "type": "string",
+        "placeholder": "string"
+      }
+    },
+    "container": {
+      "props": {
+        "children": "array"
+      }
+    }
+  }
+}

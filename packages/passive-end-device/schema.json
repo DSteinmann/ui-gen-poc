@@ -1,0 +1,27 @@
+{
+  "name": "passive-end-device",
+  "capabilities": {
+    "wiggle": {
+      "props": {
+        "label": "string",
+        "action": "object"
+      }
+    },
+    "text": {
+      "props": {
+        "content": "string"
+      }
+    },
+    "input": {
+      "props": {
+        "type": "string",
+        "placeholder": "string"
+      }
+    },
+    "container": {
+      "props": {
+        "children": "array"
+      }
+    }
+  }
+}
