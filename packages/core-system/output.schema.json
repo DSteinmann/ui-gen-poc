@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UI Definition Schema",
+  "type": "object",
+  "properties": {
+    "props": {
+      "type": "object",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/component"
+          }
+        }
+      },
+      "required": ["children"]
+    }
+  },
+  "definitions": {
+    "component": {
+      "type": "object",
+      "oneOf": [
+        { "$ref": "#/definitions/textComponent" },
+        { "$ref": "#/definitions/buttonComponent" },
+        { "$ref": "#/definitions/toggleComponent" },
+        { "$ref": "#/definitions/inputComponent" },
+        { "$ref": "#/definitions/speakComponent" },
+        { "$ref": "#/definitions/toolCall" }
+      ]
+    },
+    "textComponent": {
+      "type": "object",
+      "properties": {
+        "component": { "const": "text" },
+        "props": {
+          "type": "object",
+          "properties": {
+            "content": { "type": "string" }
+          },
+          "required": ["content"]
+        }
+      },
+      "required": ["component", "props"]
+    },
+    "buttonComponent": {
+      "type": "object",
+      "properties": {
+        "component": { "const": "button" },
+        "props": {
+          "type": "object",
+          "properties": {
+            "label": { "type": "string" },
+            "action": { "type": "object" }
+          },
+          "required": ["label"]
+        }
+      },
+      "required": ["component", "props"]
+    },
+    "toggleComponent": {
+      "type": "object",
+      "properties": {
+        "component": { "const": "toggle" },
+        "props": {
+          "type": "object",
+          "properties": {
+            "label": { "type": "string" },
+            "checked": { "type": "boolean" },
+            "action": { "type": "object" }
+          },
+          "required": ["label"]
+        }
+      },
+      "required": ["component", "props"]
+    },
+    "inputComponent": {
+      "type": "object",
+      "properties": {
+        "component": { "const": "input" },
+        "props": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string" },
+            "placeholder": { "type": "string" }
+          }
+        }
+      },
+      "required": ["component", "props"]
+    },
+    "speakComponent": {
+      "type": "object",
+      "properties": {
+        "component": { "const": "speak" },
+        "props": {
+          "type": "object",
+          "properties": {
+            "text": { "type": "string" }
+          },
+          "required": ["text"]
+        }
+      },
+      "required": ["component", "props"]
+    },
+    "toolCall": {
+      "type": "object",
+      "properties": {
+        "tool": { "type": "string" },
+        "parameters": { "type": "object" }
+      },
+      "required": ["tool"]
+    }
+  }
+}

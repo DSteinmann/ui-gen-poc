@@ -1,6 +1,13 @@
 {
   "name": "end-device",
-  "capabilities": {
+  "model": "mistralai/magistral-small-2509",
+  "tools": {
+    "getAmbientLight": {
+      "description": "Gets the current ambient light level from the device's sensor.",
+      "returns": "string"
+    }
+  },
+  "components": {
     "button": {
       "props": {
         "label": "string",
