@@ -115,6 +115,16 @@ const seedDocuments = [
     },
     tags: ['modality', 'hands-occupied', 'audio', 'light-switch'],
   },
+  {
+    id: 'user-preference-primary-color',
+    content:
+      'The primary household preference for interface accents is the color "#1F6FEB" (a vivid cobalt). Whenever possible, set the UI theme primary color to this value so buttons, toggles, and other interactive highlights align with the user preference. Ensure sufficient contrast by using light text on dark backgrounds.',
+    metadata: {
+      source: 'user-profile',
+      version: '2025.10',
+    },
+    tags: ['preference', 'theme', 'primary-color', 'personalization'],
+  },
 ];
 
 const seedKnowledgeBase = () => {
@@ -274,6 +284,14 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
     messages.push({
       role: 'system',
       content: `Use the following requirement knowledge when crafting the UI:\n\n${requirementContext}`,
+    });
+  }
+
+  if (uiSchema.theming?.supportsPrimaryColor) {
+    messages.push({
+      role: 'system',
+      content:
+        'The device supports theming through the root `theme.primaryColor` field. When requirements or preferences mention a specific color (hex value), set `theme.primaryColor` accordingly to personalize the interface, while keeping sufficient contrast for readability.',
     });
   }
 

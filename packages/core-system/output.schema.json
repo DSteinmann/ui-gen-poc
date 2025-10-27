@@ -14,8 +14,20 @@
         }
       },
       "required": ["children"]
+    },
+    "theme": {
+      "type": "object",
+      "properties": {
+        "primaryColor": {
+          "type": "string",
+          "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+          "description": "Hexadecimal color value representing the preferred primary accent color."
+        }
+      },
+      "additionalProperties": false
     }
   },
+  "required": ["props"],
   "definitions": {
     "component": {
       "type": "object",

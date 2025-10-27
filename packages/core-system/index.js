@@ -13,7 +13,7 @@ const wss = new WebSocketServer({ server });
 
 const port = 3001;
 const registryPort = 3000;
-const uiRefreshIntervalMs = 5000;
+const uiRefreshIntervalMs = 60000;
 const fallbackPrompt = 'Generate an adaptive interface for the registered device.';
 
 const serviceRegistryByType = {

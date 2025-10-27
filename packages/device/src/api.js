@@ -53,7 +53,7 @@ const deviceThingDescription = {
   uiModalities: ['visual', 'audio'],
 };
 
-const defaultPrompt = 'Provide controls for a connected light switch including status feedback. When the user activity sensor reports hands-occupied, switch to audio guidance. Otherwise render touch-friendly controls.';
+const defaultPrompt = 'Provide controls for a connected light switch including status feedback. When the user activity sensor reports hands-occupied, switch to audio guidance. Otherwise render touch-friendly controls. If the requirement knowledge base includes a preferred primary color, set the UI theme.primaryColor to that value so the interface is personalized.';
 
 const uiSchema = {
   name: 'smartphone-light-switch-ui',
@@ -62,6 +62,11 @@ const uiSchema = {
     button: { description: 'Action button triggering remote actions.' },
     toggle: { description: 'Switch element representing light state.' },
     speak: { description: 'Audio output prompt for hands-busy scenarios.' },
+  },
+  theming: {
+    description: 'Supports root `theme.primaryColor` (hex color) for accent styling.',
+    supportsPrimaryColor: true,
+    defaultPrimaryColor: '#1f6feb',
   },
   context: {
     controlledThing: 'light-switch',
@@ -81,6 +86,7 @@ const registerWithCoreSystem = async () => {
       supportedUiComponents: ['text', 'button', 'toggle', 'speak'],
       supportsAudio: true,
       supportsTouch: true,
+      supportsTheming: ['theme.primaryColor'],
       defaultPrompt,
       uiSchema,
     },
