@@ -63,6 +63,15 @@ const uiSchema = {
     toggle: { description: 'Switch element representing light state.' },
     speak: { description: 'Audio output prompt for hands-busy scenarios.' },
   },
+  tools: {
+    getUserActivity: {
+      description: 'Retrieve the latest user activity state from the activity sensor capability.',
+      service: 'user-activity-sensor',
+      capability: 'userActivity',
+      path: '/activity',
+      method: 'GET',
+    },
+  },
   theming: {
     description: 'Supports root `theme.primaryColor` (hex color) for accent styling.',
     supportsPrimaryColor: true,
@@ -87,6 +96,7 @@ const registerWithCoreSystem = async () => {
       supportsAudio: true,
       supportsTouch: true,
       supportsTheming: ['theme.primaryColor'],
+      supportedTools: ['getUserActivity'],
       defaultPrompt,
       uiSchema,
     },

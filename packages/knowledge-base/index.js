@@ -93,13 +93,6 @@ const addDocument = ({ id, content, metadata = {}, tags = [] }) => {
       documents.find((doc) => doc.id === docId)?.createdAt || nowIsoString(),
   };
 
-  const existingIndex = documents.findIndex((doc) => doc.id === docId);
-  if (existingIndex !== -1) {
-    documents[existingIndex] = record;
-  } else {
-    documents.push(record);
-  }
-
   persistDocuments(documents);
   return record;
 };
@@ -189,28 +182,7 @@ const retrieveRelevantDocuments = ({ prompt, thingDescription, capabilityData, c
   return scoredDocuments;
 };
 
-const registerWithServiceRegistry = async () => {
-  try {
-    await fetch('http://localhost:3000/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'knowledge-base',
-        url: `http://localhost:${port}`,
-      })
-    });
-    console.log('Registered with service registry');
-  } catch (error) {
-    console.error('Error registering with service registry:', error);
-  }
-};
-
 async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema = {}, capabilityData, missingCapabilities, device, deviceId }) {
-  console.log('[KB] runAgent invoked', {
-    deviceId: deviceId || null,
-    capabilitiesCount: Array.isArray(capabilities) ? capabilities.length : 0,
-    hasSchema: Boolean(uiSchema && Object.keys(uiSchema).length),
-  });
   const availableComponents = uiSchema.components || {};
   const availableComponentNames = Object.keys(availableComponents);
   const availableTools = uiSchema.tools || {};
@@ -232,14 +204,13 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
     console.log('Retrieved documents for context:', retrievedDocuments.map((doc) => `${doc.id} (score ${doc.score.toFixed(3)})`));
   }
 
-  // Filter definitions based on available components
   for (const key in filteredSchema.definitions) {
     if (key.endsWith('Component') && !availableComponentNames.includes(key.replace('Component', ''))) {
       delete filteredSchema.definitions[key];
     }
   }
 
-  if (filteredSchema.definitions.component && filteredSchema.definitions.component.oneOf) {
+  if (filteredSchema.definitions.component?.oneOf) {
     filteredSchema.definitions.component.oneOf = filteredSchema.definitions.component.oneOf.filter((ref) => {
       const componentName = ref.$ref.split('/').pop().replace('Component', '');
       return availableComponentNames.includes(componentName) || componentName === 'toolCall';
@@ -251,23 +222,26 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
       filteredSchema.definitions.toolCall.properties.tool.enum = availableToolNames;
     } else {
       delete filteredSchema.definitions.toolCall;
-      if (filteredSchema.definitions.component && filteredSchema.definitions.component.oneOf) {
+      if (filteredSchema.definitions.component?.oneOf) {
         filteredSchema.definitions.component.oneOf = filteredSchema.definitions.component.oneOf.filter((ref) => ref.$ref !== '#/definitions/toolCall');
       }
     }
   }
 
-  const tools = Object.entries(availableTools).map(([name, tool]) => ({
-    type: 'function',
-    function: {
-      name,
-      description: tool.description,
-      parameters: {
-        type: 'object',
-        properties: {},
+  const toolDefinitions = Object.entries(availableTools).map(([name, tool]) => {
+    const parameterSchema = tool && typeof tool.parameters === 'object'
+      ? tool.parameters
+      : { type: 'object', properties: {}, additionalProperties: false };
+
+    return {
+      type: 'function',
+      function: {
+        name,
+        description: tool?.description || `Invoke tool '${name}'`,
+        parameters: parameterSchema,
       },
-    },
-  }));
+    };
+  });
 
   const requirementContext = retrievedDocuments
     .map((doc, index) => `Document ${index + 1} (score: ${doc.score.toFixed(3)}):\nSource: ${doc.metadata?.source || 'unspecified'}\nTags: ${(doc.tags || []).join(', ') || 'none'}\n${doc.content}`)
@@ -290,8 +264,14 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
   if (uiSchema.theming?.supportsPrimaryColor) {
     messages.push({
       role: 'system',
-      content:
-        'The device supports theming through the root `theme.primaryColor` field. When requirements or preferences mention a specific color (hex value), set `theme.primaryColor` accordingly to personalize the interface, while keeping sufficient contrast for readability.',
+      content: 'The device supports theming through the root `theme.primaryColor` field. When requirements or preferences mention a specific color (hex value), set `theme.primaryColor` accordingly to personalize the interface, while keeping sufficient contrast for readability.',
+    });
+  }
+
+  if (availableToolNames.length > 0) {
+    messages.push({
+      role: 'system',
+      content: `Tools available: ${availableToolNames.join(', ')}. Call the appropriate tool to retrieve real-time capability data before finalizing the UI response.`,
     });
   }
 
@@ -309,28 +289,57 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
     content: JSON.stringify(userContext, null, 2),
   });
 
+  const composeToolUrl = (base, path = '') => {
+    if (!path || path === '/') {
+      return base;
+    }
+    return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+  };
+
+  const parseAssistantContent = (content) => {
+    if (!content || typeof content !== 'string') {
+      return null;
+    }
+    try {
+      return JSON.parse(content);
+    } catch (error) {
+      console.error('[KB] Failed to parse assistant content as JSON:', error);
+      return null;
+    }
+  };
+
   let uiDefinition;
+  let toolInteractionOccurred = false;
+  let schemaReminderAdded = false;
+  let attemptsWithoutTool = 0;
+  const maxAttemptsWithoutTool = 2;
+  let enforceSchema = availableToolNames.length === 0;
 
   while (true) {
-    console.log('[KB] Invoking LLM endpoint http://192.168.1.73:1234/v1/chat/completions with model', uiSchema.model || 'gemma 3b');
+    const requestPayload = {
+      model: uiSchema.model || 'gemma 3b',
+      messages,
+      temperature: 0.7,
+    };
+
+    if (toolDefinitions.length > 0) {
+      requestPayload.tools = toolDefinitions;
+      requestPayload.tool_choice = 'auto';
+    }
+
+    if (enforceSchema) {
+      requestPayload.response_format = {
+        type: 'json_schema',
+        json_schema: { schema: filteredSchema },
+      };
+    }
+
+    console.log('[KB] Invoking LLM endpoint http://192.168.1.73:1234/v1/chat/completions with model', requestPayload.model, 'schema enforced?', enforceSchema);
+
     const llmResponse = await fetch('http://192.168.1.73:1234/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: uiSchema.model || 'gemma 3b',
-        messages,
-        temperature: 0.7,
-        tools,
-        tool_choice: 'auto',
-        response_format: {
-          type: 'json_schema',
-          json_schema: {
-            schema: filteredSchema,
-          },
-        },
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestPayload),
     });
 
     if (!llmResponse.ok) {
@@ -342,49 +351,171 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
     const llmData = await llmResponse.json();
     console.log('LLM Data:', llmData);
 
-    if (!llmData.choices || llmData.choices.length === 0) {
-      console.error('LLM returned no choices.');
+    const responseMessage = llmData?.choices?.[0]?.message;
+    if (!responseMessage) {
+      console.error('[KB] LLM response missing message payload.');
       uiDefinition = {
         type: 'container',
-        children: [
-          { type: 'text', content: 'Error: LLM returned no choices.' },
-        ],
+        children: [{ type: 'text', content: 'Error: LLM returned an empty response.' }],
       };
       break;
     }
 
-    const llmJson = JSON.parse(llmData.choices[0].message.content);
-    console.log('LLM Raw Response:', llmJson);
+    const parsedContent = parseAssistantContent(responseMessage.content);
+    const toolCalls = Array.isArray(responseMessage.tool_calls) && responseMessage.tool_calls.length > 0
+      ? responseMessage.tool_calls
+      : Array.isArray(parsedContent?.tool_calls) ? parsedContent.tool_calls : [];
 
-    if (llmJson.tool_calls) {
-      const { tool_calls } = llmJson;
-      for (const toolCall of tool_calls) {
-        const { function: { name } } = toolCall;
-        console.log(`Calling tool: ${name}`);
+    if (toolCalls.length > 0) {
+      console.log('[KB] Tool calls requested:', toolCalls.map((call) => call.function?.name).filter(Boolean));
+      messages.push({
+        role: 'assistant',
+        content: responseMessage.content || '',
+        tool_calls: toolCalls,
+      });
 
-        try {
-          if (!uiSchema.name) {
-            throw new Error('Schema name missing; cannot resolve tool endpoint.');
-          }
-
-    console.log(`[KB] Resolving tool '${name}' for service ${uiSchema.name}`);
-    const serviceResponse = await fetch(`http://localhost:3000/services/${uiSchema.name}`);
-          const service = await serviceResponse.json();
-    console.log(`[KB] Tool '${name}' resolved at ${service.url}`);
-          const toolResponse = await fetch(`${service.url}/${name}`);
-
-          const toolResult = await toolResponse.json();
-          messages.push({ role: 'assistant', content: JSON.stringify(llmJson) });
-          messages.push({ role: 'tool', tool_call_id: toolCall.id, name, content: JSON.stringify(toolResult) });
-        } catch (error) {
-          console.error('Error calling tool:', error);
-          messages.push({ role: 'tool', tool_call_id: toolCall.id, name, content: JSON.stringify({ error: error.message }) });
+      for (const toolCall of toolCalls) {
+        const toolName = toolCall?.function?.name;
+        if (!toolName) {
+          console.warn('[KB] Tool call missing function name, skipping.');
+          continue;
         }
+
+        const toolDefinition = availableTools[toolName];
+        if (!toolDefinition) {
+          console.error(`[KB] Tool '${toolName}' not defined in schema.`);
+          messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            name: toolName,
+            content: JSON.stringify({ error: `Tool '${toolName}' unavailable.` }),
+          });
+          continue;
+        }
+
+        let args = {};
+        const rawArguments = toolCall?.function?.arguments;
+        if (typeof rawArguments === 'string' && rawArguments.trim().length > 0) {
+          try {
+            args = JSON.parse(rawArguments);
+          } catch (error) {
+            console.error(`[KB] Failed to parse arguments for tool '${toolName}':`, error);
+          }
+        }
+
+        let serviceUrl = toolDefinition.url;
+        if (!serviceUrl && toolDefinition.service) {
+          try {
+            const serviceResponse = await fetch(`http://localhost:3000/services/${toolDefinition.service}`);
+            if (!serviceResponse.ok) {
+              throw new Error(`Registry responded with status ${serviceResponse.status}`);
+            }
+            const serviceRecord = await serviceResponse.json();
+            serviceUrl = serviceRecord.url;
+          } catch (error) {
+            console.error(`[KB] Failed to resolve service '${toolDefinition.service}' for tool '${toolName}':`, error);
+            messages.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              name: toolName,
+              content: JSON.stringify({ error: `Unable to resolve service '${toolDefinition.service}': ${error.message}` }),
+            });
+            continue;
+          }
+        }
+
+        if (!serviceUrl) {
+          console.error(`[KB] No service URL configured for tool '${toolName}'.`);
+          messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            name: toolName,
+            content: JSON.stringify({ error: 'Tool endpoint not configured.' }),
+          });
+          continue;
+        }
+
+        const endpointPath = toolDefinition.path || toolDefinition.endpoint || '';
+        const requestUrl = composeToolUrl(serviceUrl, endpointPath);
+        const method = (toolDefinition.method || 'GET').toUpperCase();
+        const headers = { ...(toolDefinition.headers || {}) };
+        const requestInit = { method, headers };
+
+        if (method !== 'GET') {
+          headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+          requestInit.body = JSON.stringify(args || {});
+        }
+
+        console.log(`[KB] Invoking tool '${toolName}' via ${method} ${requestUrl}`);
+
+        let toolResult;
+        try {
+          const toolResponse = await fetch(requestUrl, requestInit);
+          if (!toolResponse.ok) {
+            const errorBody = await toolResponse.text();
+            toolResult = { error: `Tool responded with status ${toolResponse.status}`, details: errorBody };
+          } else {
+            const responseText = await toolResponse.text();
+            try {
+              toolResult = JSON.parse(responseText);
+            } catch {
+              toolResult = { data: responseText };
+            }
+          }
+        } catch (error) {
+          console.error(`[KB] Error invoking tool '${toolName}':`, error);
+          toolResult = { error: error.message };
+        }
+
+        messages.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          name: toolName,
+          content: JSON.stringify(toolResult),
+        });
       }
-    } else {
-      uiDefinition = llmJson;
-      break;
+
+      toolInteractionOccurred = true;
+      enforceSchema = true;
+
+      if (!schemaReminderAdded) {
+        messages.push({
+          role: 'system',
+          content: 'Tool responses received. Using these fresh results, respond next with a UI object that strictly matches the provided JSON schema.',
+        });
+        schemaReminderAdded = true;
+      }
+
+      continue;
     }
+
+    if (availableToolNames.length > 0 && !toolInteractionOccurred) {
+      attemptsWithoutTool += 1;
+      console.warn(`[KB] No tool call detected despite available tools (attempt ${attemptsWithoutTool}).`);
+
+      if (attemptsWithoutTool <= maxAttemptsWithoutTool) {
+        messages.push({
+          role: 'system',
+          content: 'You must call at least one available tool (for example, getUserActivity) to fetch real-time data before finalizing the UI. Do not guess values—call a tool now.',
+        });
+        enforceSchema = false;
+        continue;
+      }
+
+      console.warn('[KB] Proceeding without tool execution after maximum retries.');
+      enforceSchema = true;
+    }
+
+    if (!parsedContent || Object.keys(parsedContent).length === 0) {
+      console.error('[KB] Parsed assistant content is empty.');
+      uiDefinition = {
+        type: 'container',
+        children: [{ type: 'text', content: 'Error: LLM response was empty after tool usage.' }],
+      };
+    } else {
+      uiDefinition = parsedContent;
+    }
+    break;
   }
 
   return uiDefinition;

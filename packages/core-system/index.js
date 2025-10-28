@@ -245,12 +245,37 @@ const generateUiForDevice = async ({
     device: deviceInfo,
   });
 
+  const toolConfig = (deviceInfo?.uiSchema && typeof deviceInfo.uiSchema === 'object') ? deviceInfo.uiSchema.tools || {} : {};
+  const capabilityToolHints = {};
+  Object.entries(toolConfig).forEach(([toolName, config]) => {
+    if (config && typeof config === 'object') {
+      const capabilityKey = config.capability || config.capabilityAlias || config.provides;
+      if (capabilityKey) {
+        capabilityToolHints[capabilityKey] = toolName;
+      }
+    }
+  });
+
+  const sanitizedCapabilityData = {};
+  Object.entries(capabilityData).forEach(([capabilityName, details]) => {
+    const toolName = capabilityToolHints[capabilityName];
+    if (toolName) {
+      sanitizedCapabilityData[capabilityName] = {
+        note: `Use tool '${toolName}' to retrieve the latest data for capability '${capabilityName}'.`,
+        ...(details?.error ? { error: details.error } : {}),
+        ...(details?.data !== undefined ? { cachedSample: details.data } : {}),
+      };
+    } else {
+      sanitizedCapabilityData[capabilityName] = details;
+    }
+  });
+
   const knowledgeBasePayload = {
     prompt: resolvedPrompt,
     schema: resolvedSchema,
     thingDescription: resolvedThingDescription,
     capabilities: resolvedCapabilities,
-    capabilityData,
+    capabilityData: sanitizedCapabilityData,
     missingCapabilities,
     deviceId,
     device: deviceInfo,
