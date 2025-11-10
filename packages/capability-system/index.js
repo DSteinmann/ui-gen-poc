@@ -6,9 +6,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const port = 3003;
+const port = Number.parseInt(process.env.CAPABILITY_PORT || '3003', 10);
 const moduleName = 'user-activity-sensor';
-const coreRefreshEndpoint = 'http://localhost:3001/refresh';
+const listenAddress = process.env.BIND_ADDRESS || '0.0.0.0';
+const coreSystemBaseUrl = process.env.CORE_SYSTEM_URL || 'http://localhost:3001';
+const serviceRegistryUrl = process.env.SERVICE_REGISTRY_URL || 'http://localhost:3000';
+const capabilityPublicUrl = process.env.CAPABILITY_PUBLIC_URL || `http://localhost:${port}`;
+const coreRefreshEndpoint = `${coreSystemBaseUrl}/refresh`;
 const activityRotationIntervalMs = Number.parseInt(process.env.ACTIVITY_ROTATION_INTERVAL_MS || '90000', 10);
 
 const activityStates = [
@@ -59,12 +63,12 @@ const scheduleNextRotation = () => {
 
 const registerWithServiceRegistry = async () => {
   try {
-    await fetch('http://localhost:3000/register', {
+    await fetch(`${serviceRegistryUrl}/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: moduleName,
-        url: `http://localhost:${port}`,
+        url: capabilityPublicUrl,
         type: 'capability',
         metadata: {
           category: 'user-activity',
@@ -80,7 +84,7 @@ const registerWithServiceRegistry = async () => {
 const registerWithCoreSystem = async () => {
   const capabilityRegistrationPayload = {
     name: moduleName,
-    url: `http://localhost:${port}`,
+  url: capabilityPublicUrl,
     provides: ['userActivity'],
         metadata: {
           description: 'Detects whether the user has their hands free or occupied.',
@@ -95,7 +99,7 @@ const registerWithCoreSystem = async () => {
   };
 
   try {
-    await fetch('http://localhost:3001/register/capability', {
+  await fetch(`${coreSystemBaseUrl}/register/capability`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(capabilityRegistrationPayload),
@@ -144,8 +148,8 @@ app.get('/activity', (_req, res) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`User activity sensor listening at http://localhost:${port}`);
+app.listen(port, listenAddress, () => {
+  console.log(`User activity sensor listening at ${listenAddress}:${port} (public URL: ${capabilityPublicUrl})`);
   registerWithServiceRegistry();
   registerWithCoreSystem();
   scheduleNextRotation();

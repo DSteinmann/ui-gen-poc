@@ -1,0 +1,89 @@
+version: "3.9"
+
+services:
+  core-system:
+    build:
+      context: .
+      dockerfile: packages/core-system/Dockerfile
+    environment:
+      CORE_SYSTEM_PORT: 3001
+      SERVICE_REGISTRY_PORT: 3000
+      CORE_SYSTEM_PUBLIC_URL: http://core-system:3001
+      SERVICE_REGISTRY_PUBLIC_URL: http://core-system:3000
+      SERVICE_REGISTRY_URL: http://core-system:3000
+      KNOWLEDGE_BASE_URL: http://knowledge-base:3005
+      BIND_ADDRESS: 0.0.0.0
+    ports:
+      - "3001:3001"
+      - "3000:3000"
+    restart: unless-stopped
+
+  knowledge-base:
+    build:
+      context: .
+      dockerfile: packages/knowledge-base/Dockerfile
+    environment:
+      KNOWLEDGE_BASE_PORT: 3005
+      KNOWLEDGE_BASE_PUBLIC_URL: http://knowledge-base:3005
+      SERVICE_REGISTRY_URL: http://core-system:3000
+      LLM_ENDPOINT: http://192.168.1.73:1234/v1/chat/completions
+      KNOWLEDGE_BASE_DATA_FILE: /data/kb-data.json
+      BIND_ADDRESS: 0.0.0.0
+    ports:
+      - "3005:3005"
+    volumes:
+      - knowledge-base-data:/data
+    depends_on:
+      - core-system
+    restart: unless-stopped
+
+  capability-system:
+    build:
+      context: .
+      dockerfile: packages/capability-system/Dockerfile
+    environment:
+      CAPABILITY_PORT: 3003
+      CAPABILITY_PUBLIC_URL: http://capability-system:3003
+      CORE_SYSTEM_URL: http://core-system:3001
+      SERVICE_REGISTRY_URL: http://core-system:3000
+      BIND_ADDRESS: 0.0.0.0
+    ports:
+      - "3003:3003"
+    depends_on:
+      - core-system
+    restart: unless-stopped
+
+  device-api:
+    build:
+      context: .
+      dockerfile: packages/device/Dockerfile
+    command: ["npm", "run", "server"]
+    environment:
+      DEVICE_API_PORT: 3002
+      DEVICE_API_PUBLIC_URL: http://device-api:3002
+      CORE_SYSTEM_URL: http://core-system:3001
+      SERVICE_REGISTRY_URL: http://core-system:3000
+      BIND_ADDRESS: 0.0.0.0
+    ports:
+      - "3002:3002"
+    depends_on:
+      - core-system
+    restart: unless-stopped
+
+  device-ui:
+    build:
+      context: .
+      dockerfile: packages/device/Dockerfile
+    environment:
+      VITE_CORE_WS_URL: ws://core-system:3001
+      VITE_CORE_WS_FALLBACK_PORT: 3001
+      BIND_ADDRESS: 0.0.0.0
+    command: ["npm", "run", "dev"]
+    ports:
+      - "5173:5173"
+    depends_on:
+      - core-system
+    restart: unless-stopped
+
+volumes:
+  knowledge-base-data:

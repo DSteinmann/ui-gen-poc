@@ -2,7 +2,11 @@ import express from 'express';
 import fetch from 'node-fetch';
 
 const app = express();
-const port = 3002;
+const port = Number.parseInt(process.env.DEVICE_API_PORT || '3002', 10);
+const listenAddress = process.env.BIND_ADDRESS || '0.0.0.0';
+const serviceRegistryUrl = process.env.SERVICE_REGISTRY_URL || 'http://localhost:3000';
+const coreSystemUrl = process.env.CORE_SYSTEM_URL || 'http://localhost:3001';
+const devicePublicUrl = process.env.DEVICE_API_PUBLIC_URL || `http://localhost:${port}`;
 
 app.use(express.json());
 
@@ -10,12 +14,12 @@ const deviceId = 'device-smartphone-001';
 
 const registerWithServiceRegistry = async () => {
   try {
-    await fetch('http://localhost:3000/register', {
+    await fetch(`${serviceRegistryUrl}/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: 'smartphone-device',
-        url: `http://localhost:${port}`,
+        url: devicePublicUrl,
         type: 'device',
         metadata: {
           deviceId,
@@ -87,7 +91,7 @@ const registerWithCoreSystem = async () => {
   const deviceRegistrationPayload = {
     id: deviceId,
     name: 'Smartphone Controller',
-    url: `http://localhost:${port}`,
+  url: devicePublicUrl,
     thingDescription: deviceThingDescription,
     capabilities: ['userActivity'],
     metadata: {
@@ -105,7 +109,7 @@ const registerWithCoreSystem = async () => {
   };
 
   try {
-    await fetch('http://localhost:3001/register/device', {
+    await fetch(`${coreSystemUrl}/register/device`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(deviceRegistrationPayload),
@@ -128,8 +132,8 @@ app.post('/api/call-tool', (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Smartphone device service listening at http://localhost:${port}`);
+app.listen(port, listenAddress, () => {
+  console.log(`Smartphone device service listening at ${listenAddress}:${port} (public URL: ${devicePublicUrl})`);
   registerWithServiceRegistry();
   registerWithCoreSystem();
 });

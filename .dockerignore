@@ -1,0 +1,9 @@
+node_modules
+npm-debug.log
+.git
+scripts/logs
+scripts/.pids
+packages/**/node_modules
+packages/**/dist
+packages/**/kb-data.json
+.DS_Store

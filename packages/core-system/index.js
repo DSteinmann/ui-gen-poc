@@ -11,10 +11,15 @@ app.use(cors());
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-const port = 3001;
-const registryPort = 3000;
+const port = Number.parseInt(process.env.CORE_SYSTEM_PORT || '3001', 10);
+const registryPort = Number.parseInt(process.env.SERVICE_REGISTRY_PORT || '3000', 10);
 const uiRefreshIntervalMs = 60000;
 const fallbackPrompt = 'Generate an adaptive interface for the registered device.';
+const corePublicUrl = process.env.CORE_SYSTEM_PUBLIC_URL || `http://localhost:${port}`;
+const registryPublicUrl = process.env.SERVICE_REGISTRY_PUBLIC_URL || `http://localhost:${registryPort}`;
+const serviceRegistryUrl = process.env.SERVICE_REGISTRY_URL || registryPublicUrl;
+const knowledgeBaseUrl = process.env.KNOWLEDGE_BASE_URL || 'http://localhost:3005';
+const listenAddress = process.env.BIND_ADDRESS || '0.0.0.0';
 
 const serviceRegistryByType = {
   generic: new Map(),
@@ -24,6 +29,7 @@ const serviceRegistryByType = {
 const capabilityAliasIndex = new Map();
 const deviceRegistry = new Map();
 const deviceSockets = new Map(); // deviceId -> Set<WebSocket>
+const latestUiByDevice = new Map(); // deviceId -> last generated UI definition
 
 const nowIsoString = () => new Date().toISOString();
 
@@ -155,14 +161,211 @@ const registrySnapshot = () => ({
   services: Array.from(serviceRegistryByType.generic.values()),
 });
 
+const scoreDeviceForCapabilities = (device, desiredCapabilities = []) => {
+  if (!device) {
+    return { matches: 0, missing: desiredCapabilities.slice(), supportsAll: false };
+  }
+
+  const supported = new Set(Array.isArray(device.capabilities) ? device.capabilities : []);
+  const missing = [];
+  let matches = 0;
+
+  desiredCapabilities.forEach((capability) => {
+    if (supported.has(capability)) {
+      matches += 1;
+    } else {
+      missing.push(capability);
+    }
+  });
+
+  return {
+    matches,
+    missing,
+    supportsAll: missing.length === 0,
+  };
+};
+
+const selectTargetDevice = ({ requestedDeviceId, desiredCapabilities = [] } = {}) => {
+  if (requestedDeviceId) {
+    const explicitDevice = deviceRegistry.get(requestedDeviceId);
+    return {
+      device: explicitDevice || null,
+      reason: explicitDevice ? 'explicit-device-request' : 'requested-device-not-found',
+      score: scoreDeviceForCapabilities(explicitDevice, desiredCapabilities),
+    };
+  }
+
+  const devices = Array.from(deviceRegistry.values());
+  if (devices.length === 0) {
+    return { device: null, reason: 'no-devices-registered', score: scoreDeviceForCapabilities(null, desiredCapabilities) };
+  }
+
+  if (!desiredCapabilities || desiredCapabilities.length === 0) {
+    return {
+      device: devices[0],
+      reason: 'no-capabilities-requested',
+      score: scoreDeviceForCapabilities(devices[0], desiredCapabilities),
+    };
+  }
+
+  const ranked = devices
+    .map((device) => ({
+      device,
+      score: scoreDeviceForCapabilities(device, desiredCapabilities),
+    }))
+    .sort((a, b) => {
+      if (a.score.supportsAll && !b.score.supportsAll) return -1;
+      if (!a.score.supportsAll && b.score.supportsAll) return 1;
+      if (b.score.matches !== a.score.matches) {
+        return b.score.matches - a.score.matches;
+      }
+      return (a.score.missing.length || Infinity) - (b.score.missing.length || Infinity);
+    });
+
+  const bestMatch = ranked[0];
+
+  return {
+    device: bestMatch?.device || null,
+    reason: bestMatch ? 'auto-selected-best-match' : 'no-suitable-device-found',
+    score: bestMatch?.score || scoreDeviceForCapabilities(null, desiredCapabilities),
+  };
+};
+
+const buildDynamicPrompt = ({
+  basePrompt,
+  targetDevice,
+  desiredCapabilities = [],
+  selectionReason,
+  selectionScore,
+}) => {
+  const deviceSummaries = Array.from(deviceRegistry.values()).map((device) => {
+    const supportedComponents = Array.isArray(device.metadata?.supportedUiComponents)
+      ? device.metadata.supportedUiComponents.join(', ')
+      : 'unspecified';
+    const capabilityList = Array.isArray(device.capabilities) && device.capabilities.length > 0
+      ? device.capabilities.join(', ')
+      : 'none';
+
+    return `- ${device.name} (${device.id}): capabilities [${capabilityList}], components [${supportedComponents}]`;
+  });
+
+  const targetSummary = targetDevice
+    ? `${targetDevice.name} (${targetDevice.id})`
+    : 'none available';
+
+  const capabilityClause = desiredCapabilities.length > 0
+    ? `Requested capabilities: ${desiredCapabilities.join(', ')}.`
+    : 'No explicit capability requirements were provided.';
+
+  const selectionClause = selectionReason
+    ? `Selection reason: ${selectionReason}${selectionScore?.missing?.length ? ` (missing capabilities: ${selectionScore.missing.join(', ')})` : ''}.`
+    : 'Selection reason: not provided.';
+
+  return [
+    basePrompt,
+    '---',
+    'Connected device overview:',
+    deviceSummaries.join('\n'),
+    capabilityClause,
+    `Target device for this UI: ${targetSummary}.`,
+    selectionClause,
+    'Make sure the generated UI is tailored to the target device and its capabilities.',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+};
+
+const selectDeviceViaKnowledgeBase = async ({
+  prompt,
+  thingDescription,
+  desiredCapabilities = [],
+  model,
+}) => {
+  const candidates = Array.from(deviceRegistry.values());
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const candidatePayload = candidates.map((device) => {
+    const score = scoreDeviceForCapabilities(device, desiredCapabilities);
+    return {
+      id: device.id,
+      name: device.name,
+      capabilities: device.capabilities,
+      metadata: {
+        deviceType: device.metadata?.deviceType,
+        supportsAudio: device.metadata?.supportsAudio || false,
+        supportsTouch: device.metadata?.supportsTouch || false,
+        supportsTheming: device.metadata?.supportsTheming || [],
+        supportedUiComponents: device.metadata?.supportedUiComponents || [],
+      },
+      uiSchema: device.uiSchema
+        ? {
+            components: device.uiSchema.components || {},
+            tools: device.uiSchema.tools || {},
+            theming: device.uiSchema.theming || null,
+            context: device.uiSchema.context || null,
+          }
+        : null,
+      defaultPrompt: device.defaultPrompt,
+      score,
+    };
+  });
+
+  const payload = {
+    prompt,
+    fallbackPrompt,
+    desiredCapabilities,
+    thingDescription,
+    candidates: candidatePayload,
+    model,
+  };
+
+  try {
+  const response = await fetch(`${knowledgeBaseUrl}/select-device`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Core] Knowledge base device selection failed with status ${response.status}: ${errorText}`);
+      return null;
+    }
+
+    const selection = await response.json();
+    if (!selection?.targetDeviceId) {
+      console.warn('[Core] Knowledge base device selection returned no targetDeviceId.');
+      return null;
+    }
+
+    if (!deviceRegistry.has(selection.targetDeviceId)) {
+      console.warn(`[Core] Knowledge base selected unknown device '${selection.targetDeviceId}'.`);
+      return null;
+    }
+
+    return {
+      deviceId: selection.targetDeviceId,
+      reason: selection.reason || 'knowledge-base-selected-device',
+      confidence: selection.confidence || 'unknown',
+      alternateDeviceIds: Array.isArray(selection.alternateDeviceIds) ? selection.alternateDeviceIds : [],
+      raw: selection,
+    };
+  } catch (error) {
+    console.error('[Core] Device selection via knowledge base failed:', error.message);
+    return null;
+  }
+};
+
 const registerWithServiceRegistry = async () => {
   try {
-    await fetch('http://localhost:3000/register', {
+    await fetch(`${serviceRegistryUrl}/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: 'core-system',
-        url: `http://localhost:${port}`,
+        url: corePublicUrl,
       })
     });
     console.log('Registered with service registry');
@@ -180,6 +383,10 @@ const ensureSocketSet = (deviceId) => {
 };
 
 const dispatchUiToClients = (deviceId, uiDefinition) => {
+  if (deviceId) {
+    latestUiByDevice.set(deviceId, uiDefinition);
+  }
+
   const payload = JSON.stringify({
     deviceId: deviceId || null,
     generatedAt: nowIsoString(),
@@ -194,12 +401,13 @@ const dispatchUiToClients = (deviceId, uiDefinition) => {
           socket.send(payload);
         }
       });
-      return;
+    } else {
+      console.log(`[Core] Cached UI for device '${deviceId}' until a socket connects.`);
     }
-    console.warn(`No active sockets for device ${deviceId}; UI not delivered.`);
+    return;
   }
 
-  // Fallback broadcast
+  // Broadcast payload to any connected socket when no specific device target is provided.
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(payload);
@@ -214,38 +422,109 @@ const generateUiForDevice = async ({
   thingDescription,
   capabilities,
   broadcast = true,
+  model,
 }) => {
-  const deviceInfo = deviceId ? deviceRegistry.get(deviceId) : undefined;
+  const requestedCapabilities = Array.isArray(capabilities) ? capabilities.filter(Boolean) : [];
 
-  if (deviceId && !deviceInfo) {
-    throw new Error(`Unknown device '${deviceId}'.`);
+  const basePrompt = prompt || fallbackPrompt;
+  let targetDeviceId = deviceId || null;
+  let selectionMeta = null;
+
+  if (!targetDeviceId) {
+    if (deviceRegistry.size === 1) {
+      const soleDevice = deviceRegistry.values().next().value;
+      targetDeviceId = soleDevice?.id || null;
+      selectionMeta = {
+        deviceId: targetDeviceId,
+        reason: 'only-device-available',
+        confidence: 'high',
+        alternateDeviceIds: [],
+        raw: { soleDevice: true },
+        score: scoreDeviceForCapabilities(soleDevice, requestedCapabilities),
+      };
+    } else {
+      selectionMeta = await selectDeviceViaKnowledgeBase({
+        prompt: basePrompt,
+        thingDescription,
+        desiredCapabilities: requestedCapabilities,
+        model,
+      });
+
+      if (!selectionMeta || !selectionMeta.deviceId) {
+        console.warn('[Core] Falling back to heuristic device selection.');
+        const heuristic = selectTargetDevice({ desiredCapabilities: requestedCapabilities });
+        targetDeviceId = heuristic.device?.id || null;
+        selectionMeta = {
+          deviceId: targetDeviceId,
+          reason: heuristic.reason,
+          confidence: 'heuristic',
+          alternateDeviceIds: [],
+          raw: { heuristic: true },
+          score: heuristic.score,
+        };
+      } else {
+        targetDeviceId = selectionMeta.deviceId;
+      }
+    }
   }
 
-  const resolvedPrompt = prompt || deviceInfo?.defaultPrompt || fallbackPrompt;
+  if (!targetDeviceId) {
+    throw new Error('No suitable device available for UI generation.');
+  }
+
+  const targetDevice = deviceRegistry.get(targetDeviceId);
+
+  if (!targetDevice) {
+    throw new Error(`Unknown device '${targetDeviceId}'.`);
+  }
+
+  if (!selectionMeta) {
+    selectionMeta = {
+      deviceId: targetDeviceId,
+      reason: 'explicit-device-request',
+      confidence: 'certain',
+      alternateDeviceIds: [],
+      raw: { explicit: true },
+    };
+  }
+
+  const selectionScore = scoreDeviceForCapabilities(targetDevice, requestedCapabilities);
+  selectionMeta.score = selectionScore;
+
+  const resolvedCapabilities = requestedCapabilities.length > 0
+    ? requestedCapabilities
+    : Array.isArray(targetDevice.capabilities)
+      ? targetDevice.capabilities
+      : [];
+
+  const basePromptForUi = prompt || targetDevice?.defaultPrompt || fallbackPrompt;
+  const resolvedPrompt = buildDynamicPrompt({
+    basePrompt: basePromptForUi,
+    targetDevice,
+    desiredCapabilities: resolvedCapabilities,
+    selectionReason: selectionMeta.reason,
+    selectionScore,
+  });
+
   const resolvedSchema = schema && Object.keys(schema).length > 0
     ? schema
-    : deviceInfo?.uiSchema
-      ? { ...deviceInfo.uiSchema }
+    : targetDevice?.uiSchema
+      ? { ...targetDevice.uiSchema }
       : { components: {} };
 
   if (!resolvedSchema.name) {
-    resolvedSchema.name = deviceInfo?.id || 'core-system';
+    resolvedSchema.name = targetDevice.id;
   }
 
-  const resolvedThingDescription = thingDescription || deviceInfo?.thingDescription || null;
-  const resolvedCapabilities = Array.isArray(capabilities) && capabilities.length > 0
-    ? capabilities
-    : Array.isArray(deviceInfo?.capabilities)
-      ? deviceInfo.capabilities
-      : [];
+  const resolvedThingDescription = thingDescription || targetDevice?.thingDescription || null;
 
   const { capabilityData, missingCapabilities } = await collectCapabilityData(resolvedCapabilities, {
     prompt: resolvedPrompt,
-    deviceId,
-    device: deviceInfo,
+    deviceId: targetDeviceId,
+    device: targetDevice,
   });
 
-  const toolConfig = (deviceInfo?.uiSchema && typeof deviceInfo.uiSchema === 'object') ? deviceInfo.uiSchema.tools || {} : {};
+  const toolConfig = (targetDevice?.uiSchema && typeof targetDevice.uiSchema === 'object') ? targetDevice.uiSchema.tools || {} : {};
   const capabilityToolHints = {};
   Object.entries(toolConfig).forEach(([toolName, config]) => {
     if (config && typeof config === 'object') {
@@ -277,18 +556,27 @@ const generateUiForDevice = async ({
     capabilities: resolvedCapabilities,
     capabilityData: sanitizedCapabilityData,
     missingCapabilities,
-    deviceId,
-    device: deviceInfo,
+    deviceId: targetDeviceId,
+    device: targetDevice,
+    selection: {
+      reason: selectionMeta.reason,
+      score: selectionMeta.score,
+      confidence: selectionMeta.confidence,
+      alternateDeviceIds: selectionMeta.alternateDeviceIds,
+      consideredDevices: Array.from(deviceRegistry.keys()),
+      raw: selectionMeta.raw,
+      targetDeviceId,
+    },
   };
 
-  console.log(`[Core] Generating UI for device '${deviceId || 'broadcast'}' with capabilities: ${resolvedCapabilities.join(', ') || 'none'}`);
+  console.log(`[Core] Generating UI for device '${targetDeviceId}' with capabilities: ${resolvedCapabilities.join(', ') || 'none'} (reason: ${selectionMeta.reason})`);
 
   let requirementKnowledgeBaseResponse;
   try {
-    requirementKnowledgeBaseResponse = await fetch('http://localhost:3005/query', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(knowledgeBasePayload),
+  requirementKnowledgeBaseResponse = await fetch(`${knowledgeBaseUrl}/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(knowledgeBasePayload),
     });
   } catch (error) {
     console.error('[Core] Failed to reach knowledge base service:', error.message);
@@ -315,8 +603,8 @@ const generateUiForDevice = async ({
   }
 
   if (broadcast) {
-    dispatchUiToClients(deviceId, generatedUi);
-    console.log(`[Core] Dispatched UI to device '${deviceId || 'broadcast'}'.`);
+    dispatchUiToClients(targetDeviceId, generatedUi);
+    console.log(`[Core] Dispatched UI to device '${targetDeviceId}'.`);
   }
 
   return generatedUi;
@@ -342,7 +630,15 @@ const getRegistryForType = (type = 'generic') => {
   return serviceRegistryByType.generic;
 };
 
-const registerService = ({ name, url, metadata = {}, capabilities = [], type = 'generic' }) => {
+const registerService = ({
+  name,
+  url,
+  metadata = {},
+  capabilities = [],
+  type = 'generic',
+  endpoints,
+  provides,
+}) => {
   if (!name || !url) {
     throw new Error('Service registration requires `name` and `url`.');
   }
@@ -356,14 +652,41 @@ const registerService = ({ name, url, metadata = {}, capabilities = [], type = '
   const record = {
     name,
     url: normalizedUrl,
-    metadata,
-    capabilities: Array.isArray(capabilities) ? capabilities : [],
+    metadata: Object.keys(metadata).length > 0 ? metadata : existing?.metadata || {},
+    capabilities: Array.isArray(capabilities) && capabilities.length > 0
+      ? capabilities
+      : existing?.capabilities || [],
     registeredAt: existing?.registeredAt || now,
     lastHeartbeat: now,
     type,
   };
 
+  if (type === 'capability') {
+    const resolvedProvides = Array.isArray(provides) && provides.length > 0
+      ? provides
+      : Array.isArray(existing?.provides) ? existing.provides : [];
+
+    record.provides = resolvedProvides;
+
+    const resolvedEndpoints = endpoints && Object.keys(endpoints).length > 0
+      ? endpoints
+      : existing?.endpoints || {};
+
+    record.endpoints = resolvedEndpoints;
+  }
+
   registry.set(name, record);
+
+  if (name === 'knowledge-base') {
+    setTimeout(() => {
+      deviceRegistry.forEach((deviceRecord) => {
+        generateUiForDevice({ deviceId: deviceRecord.id }).catch((error) => {
+          console.error(`Failed to refresh UI for ${deviceRecord.id} after knowledge base registration:`, error.message);
+        });
+      });
+    }, 1000);
+  }
+
   return record;
 };
 
@@ -485,7 +808,7 @@ app.post('/register/device', (req, res) => {
 });
 
 app.post('/generate-ui', async (req, res) => {
-  const { prompt, schema, deviceId, thingDescription, capabilities, broadcast = true } = req.body;
+  const { prompt, schema, deviceId, thingDescription, capabilities, broadcast = true, model } = req.body;
 
   console.log(
     `Received UI generation request. Prompt: ${prompt || '[default]'}, Device: ${deviceId || 'none'}, Capabilities: ${JSON.stringify(
@@ -501,6 +824,7 @@ app.post('/generate-ui', async (req, res) => {
       thingDescription,
       capabilities,
       broadcast,
+      model,
     });
 
     res.json({ status: 'UI generated', deviceId: deviceId || null, ui });
@@ -559,16 +883,23 @@ wss.on('connection', (ws, request) => {
     console.log('WebSocket client connected without deviceId; broadcasting mode enabled.');
   }
 
-  ws.send(JSON.stringify({
+  const initialUi = deviceId ? latestUiByDevice.get(deviceId) : null;
+  const payload = {
     deviceId: deviceId || null,
     generatedAt: nowIsoString(),
-    ui: {
+    ui: initialUi || {
       type: 'container',
       children: [
         { type: 'text', content: 'Awaiting UI definition from core system…' },
       ],
     },
-  }));
+  };
+
+  if (deviceId && initialUi) {
+    console.log(`[Core] Delivered cached UI to device '${deviceId}' on socket connect.`);
+  }
+
+  ws.send(JSON.stringify(payload));
 
   ws.on('close', () => {
     if (ws.deviceId) {
@@ -586,19 +917,19 @@ wss.on('connection', (ws, request) => {
   });
 });
 
-server.listen(port, () => {
-  console.log(`UI Generator listening at http://localhost:${port}`);
+server.listen(port, listenAddress, () => {
+  console.log(`UI Generator listening at ${listenAddress}:${port} (public URL: ${corePublicUrl})`);
   registerWithServiceRegistry();
   scheduleDeviceUiRefresh();
 });
 
-const registryServer = registryApp.listen(registryPort, () => {
-  console.log(`Service registry listening at http://localhost:${registryPort}`);
+const registryServer = registryApp.listen(registryPort, listenAddress, () => {
+  console.log(`Service registry listening at ${listenAddress}:${registryPort} (public URL: ${registryPublicUrl})`);
 });
 
 registerService({
   name: 'core-system',
-  url: `http://localhost:${port}`,
+  url: corePublicUrl,
   metadata: { description: 'Core orchestration service' },
   capabilities: ['uiOrchestration'],
 });

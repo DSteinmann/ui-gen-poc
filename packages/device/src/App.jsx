@@ -1,7 +1,61 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
 const deviceId = 'device-smartphone-001';
-const websocketUrl = `ws://localhost:3001?deviceId=${encodeURIComponent(deviceId)}`;
+
+const appendDeviceId = (baseUrl) => {
+  const suffix = `deviceId=${encodeURIComponent(deviceId)}`;
+  if (!baseUrl.includes('?')) {
+    return `${baseUrl}?${suffix}`;
+  }
+
+  const hasTrailingQuestion = baseUrl.endsWith('?');
+  const separator = hasTrailingQuestion || baseUrl.endsWith('&') ? '' : '&';
+  return `${baseUrl}${separator}${suffix}`;
+};
+
+const resolveWebsocketUrl = () => {
+  const envUrl = import.meta.env.VITE_CORE_WS_URL;
+
+  if (envUrl && typeof envUrl === 'string') {
+    if (typeof window !== 'undefined') {
+      try {
+        const parsed = new URL(envUrl);
+        const browserHost = window.location.hostname || 'localhost';
+        const dockerOnlyHosts = new Set([
+          'core-system',
+          'capability-system',
+          'knowledge-base',
+          'device-api',
+          'device-ui',
+          '0.0.0.0',
+        ]);
+
+        if (dockerOnlyHosts.has(parsed.hostname)) {
+          parsed.hostname = browserHost;
+        }
+
+        parsed.searchParams.set('deviceId', deviceId);
+        return parsed.toString();
+      } catch (error) {
+        console.warn('Failed to parse VITE_CORE_WS_URL, falling back to heuristics.', error);
+        return appendDeviceId(envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl);
+      }
+    }
+
+    return appendDeviceId(envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl);
+  }
+
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.hostname || 'localhost';
+    const defaultCorePort = import.meta.env.VITE_CORE_WS_FALLBACK_PORT || '3001';
+    return `${protocol}//${host}:${defaultCorePort}?deviceId=${encodeURIComponent(deviceId)}`;
+  }
+
+  return `ws://localhost:3001?deviceId=${encodeURIComponent(deviceId)}`;
+};
+
+const websocketUrl = resolveWebsocketUrl();
 
 const DEFAULT_PRIMARY_COLOR = '#1f6feb';
 

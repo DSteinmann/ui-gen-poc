@@ -8,20 +8,88 @@ import { fileURLToPath } from 'url';
 const app = express();
 app.use(express.json());
 app.use(cors());
-const port = 3005;
+const port = Number.parseInt(process.env.KNOWLEDGE_BASE_PORT || '3005', 10);
+const listenAddress = process.env.BIND_ADDRESS || '0.0.0.0';
+const serviceRegistryUrl = process.env.SERVICE_REGISTRY_URL || 'http://localhost:3000';
+const knowledgeBasePublicUrl = process.env.KNOWLEDGE_BASE_PUBLIC_URL || `http://localhost:${port}`;
+const llmEndpoint = process.env.LLM_ENDPOINT || 'http://localhost:1234/v1/chat/completions';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const outputSchema = JSON.parse(fs.readFileSync(path.join(__dirname, '../core-system/output.schema.json'), 'utf-8'));
 
-const DATA_FILE = path.join(__dirname, 'kb-data.json');
+const deviceSelectionJsonSchema = {
+  $schema: 'http://json-schema.org/draft-07/schema#',
+  title: 'DeviceSelectionResponse',
+  type: 'object',
+  properties: {
+    targetDeviceId: {
+      type: 'string',
+      description: 'Identifier of the device that should receive the generated UI.',
+    },
+    reason: {
+      type: 'string',
+      description: 'Natural language rationale explaining why the device was selected.',
+    },
+    confidence: {
+      type: 'string',
+      enum: ['low', 'medium', 'high'],
+      description: 'Self-reported confidence in the selection.',
+    },
+    alternateDeviceIds: {
+      type: 'array',
+      description: 'Optional list of fallback device identifiers in preference order.',
+      items: { type: 'string' },
+    },
+    requestedCapabilities: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Echo of the capability list considered for the selection.',
+    },
+    considerations: {
+      type: 'array',
+      description: 'Bullet-point style list capturing the key criteria used when deciding.',
+      items: { type: 'string' },
+    },
+  },
+  required: ['targetDeviceId', 'reason'],
+};
+
+const DATA_FILE = process.env.KNOWLEDGE_BASE_DATA_FILE
+  ? path.resolve(process.env.KNOWLEDGE_BASE_DATA_FILE)
+  : path.join(__dirname, 'kb-data.json');
 
 const nowIsoString = () => new Date().toISOString();
 
 const ensureDataFile = () => {
+  const dataDir = path.dirname(DATA_FILE);
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
   if (!fs.existsSync(DATA_FILE)) {
     fs.writeFileSync(DATA_FILE, JSON.stringify({ documents: [] }, null, 2), 'utf-8');
+  }
+};
+
+const registerWithServiceRegistry = async () => {
+  try {
+    await fetch(`${serviceRegistryUrl}/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'knowledge-base',
+        url: knowledgeBasePublicUrl,
+        type: 'generic',
+        metadata: {
+          service: 'knowledge-base',
+          description: 'RAG-powered requirement knowledge base with device selection support.',
+        },
+      }),
+    });
+  console.log('[KB] Registered with service registry.');
+  } catch (error) {
+    console.error('[KB] Failed to register with service registry:', error.message);
   }
 };
 
@@ -182,7 +250,132 @@ const retrieveRelevantDocuments = ({ prompt, thingDescription, capabilityData, c
   return scoredDocuments;
 };
 
-async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema = {}, capabilityData, missingCapabilities, device, deviceId }) {
+const runDeviceSelection = async ({
+    prompt,
+    fallbackPrompt,
+    desiredCapabilities = [],
+    thingDescription,
+    candidates = [],
+    model,
+  }) => {
+    if (!Array.isArray(candidates) || candidates.length === 0) {
+      throw new Error('No device candidates provided for selection.');
+    }
+
+    const candidateSummaries = candidates.map((candidate, index) => {
+      const supportedComponents = Array.isArray(candidate.metadata?.supportedUiComponents)
+        ? candidate.metadata.supportedUiComponents.join(', ')
+        : 'unspecified';
+
+      const capabilityScore = candidate.score || {};
+      const matchSummary = capabilityScore.supportsAll
+        ? 'supports all requested capabilities'
+        : capabilityScore.matches || capabilityScore.missing
+          ? `matches ${capabilityScore.matches || 0}, missing ${(capabilityScore.missing || []).join(', ') || 'none'}`
+          : 'no score available';
+
+      const features = [
+        `Capabilities: ${(candidate.capabilities || []).join(', ') || 'none'}`,
+        `Supported components: ${supportedComponents}`,
+        `Supports audio: ${candidate.metadata?.supportsAudio ? 'yes' : 'no'}`,
+        `Supports theming: ${Array.isArray(candidate.metadata?.supportsTheming) ? candidate.metadata.supportsTheming.join(', ') : 'no'}`,
+        `Capability match: ${matchSummary}`,
+      ];
+
+      return `Candidate ${index + 1}: ${candidate.name} (${candidate.id})\n${features.join('\n')}`;
+    }).join('\n\n');
+
+    const retrievedDocuments = retrieveRelevantDocuments({
+      prompt,
+      thingDescription,
+      capabilities: desiredCapabilities,
+      capabilityData: null,
+      missingCapabilities: null,
+      device: null,
+      uiContext: null,
+    });
+
+    const knowledgeContext = retrievedDocuments.length
+      ? retrievedDocuments.map((doc, index) => `Doc ${index + 1} (score ${doc.score.toFixed(3)}): ${doc.content}`).join('\n\n')
+      : null;
+
+    const selectionMessages = [
+      {
+        role: 'system',
+        content: 'You are a device orchestration planner. Choose the best device from the provided candidates to render the requested UI. Consider capability coverage, modality support, and any documented requirements. Respond strictly using the provided JSON schema.',
+      },
+      {
+        role: 'system',
+        content: `Device candidates:\n${candidateSummaries}`,
+      },
+    ];
+
+    if (knowledgeContext) {
+      selectionMessages.push({
+        role: 'system',
+        content: `Supporting requirement documents:\n${knowledgeContext}`,
+      });
+    }
+
+    const selectionPayload = {
+      prompt,
+      fallbackPrompt,
+      desiredCapabilities,
+      thingDescription,
+      candidates,
+    };
+
+    selectionMessages.push({
+      role: 'user',
+      content: JSON.stringify(selectionPayload, null, 2),
+    });
+
+    const requestBody = {
+      model: model || 'gemma 3b',
+      messages: selectionMessages,
+      temperature: 0.3,
+      response_format: {
+        type: 'json_schema',
+        json_schema: { schema: deviceSelectionJsonSchema },
+      },
+    };
+
+  const response = await fetch(llmEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[KB] Device selection endpoint responded with status ${response.status}: ${errorText}`);
+      throw new Error(`Device selection LLM error ${response.status}`);
+    }
+
+    const data = await response.json();
+    const selectionMessage = data?.choices?.[0]?.message;
+    if (!selectionMessage?.content) {
+      throw new Error('Device selection LLM returned an empty response.');
+    }
+
+    let parsed;
+    try {
+      parsed = typeof selectionMessage.content === 'string'
+        ? JSON.parse(selectionMessage.content)
+        : Array.isArray(selectionMessage.content)
+          ? selectionMessage.content[0]
+          : selectionMessage.content;
+    } catch (error) {
+      console.error('[KB] Failed to parse device selection content:', error);
+      throw new Error('Unable to parse device selection response.');
+    }
+
+    console.log(`[KB] Device selection chose '${parsed?.targetDeviceId || 'unknown'}' with confidence ${parsed?.confidence || 'unspecified'}.`);
+
+    return parsed;
+  };
+
+async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema = {}, capabilityData, missingCapabilities, device, deviceId, selection }) {
   const availableComponents = uiSchema.components || {};
   const availableComponentNames = Object.keys(availableComponents);
   const availableTools = uiSchema.tools || {};
@@ -275,6 +468,13 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
     });
   }
 
+  if (selection?.reason && device?.name) {
+    messages.push({
+      role: 'system',
+      content: `The core system selected device "${device.name}" (${device.id}) for this UI because: ${selection.reason}. Respect any device-specific limitations when building the UI.`,
+    });
+  }
+
   const userContext = {
     prompt,
     thingDescription,
@@ -282,6 +482,7 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
     device,
     capabilityData,
     missingCapabilities,
+    selection,
   };
 
   messages.push({
@@ -334,9 +535,9 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
       };
     }
 
-    console.log('[KB] Invoking LLM endpoint http://192.168.1.73:1234/v1/chat/completions with model', requestPayload.model, 'schema enforced?', enforceSchema);
+  console.log('[KB] Invoking LLM endpoint', llmEndpoint, 'with model', requestPayload.model, 'schema enforced?', enforceSchema);
 
-    const llmResponse = await fetch('http://192.168.1.73:1234/v1/chat/completions', {
+  const llmResponse = await fetch(llmEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestPayload),
@@ -406,7 +607,7 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
         let serviceUrl = toolDefinition.url;
         if (!serviceUrl && toolDefinition.service) {
           try {
-            const serviceResponse = await fetch(`http://localhost:3000/services/${toolDefinition.service}`);
+            const serviceResponse = await fetch(`${serviceRegistryUrl}/services/${toolDefinition.service}`);
             if (!serviceResponse.ok) {
               throw new Error(`Registry responded with status ${serviceResponse.status}`);
             }
@@ -536,6 +737,32 @@ app.post('/documents', (req, res) => {
   }
 });
 
+app.post('/select-device', async (req, res) => {
+  const {
+    prompt,
+    fallbackPrompt,
+    desiredCapabilities,
+    thingDescription,
+    candidates,
+    model,
+  } = req.body || {};
+
+  try {
+    const selection = await runDeviceSelection({
+      prompt,
+      fallbackPrompt,
+      desiredCapabilities,
+      thingDescription,
+      candidates,
+      model,
+    });
+    res.json(selection);
+  } catch (error) {
+    console.error('[KB] Device selection failed:', error);
+    res.status(500).json({ error: 'Device selection failed', details: error.message });
+  }
+});
+
 app.post('/query', async (req, res) => {
   const { prompt, thingDescription, capabilities, schema, capabilityData, missingCapabilities, device, deviceId } = req.body;
   console.log('[KB] /query invoked', {
@@ -572,8 +799,8 @@ app.post('/query', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Requirement Knowledge Base listening at http://localhost:${port}`);
+app.listen(port, listenAddress, () => {
+  console.log(`Requirement Knowledge Base listening at ${listenAddress}:${port} (public URL: ${knowledgeBasePublicUrl})`);
   ensureDataFile();
   registerWithServiceRegistry();
 });
