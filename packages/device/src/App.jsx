@@ -105,41 +105,6 @@ const rgbaFromHex = (hexColor, alpha = 0.15) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-const SpeakCue = ({ text, primaryColor }) => {
-  useEffect(() => {
-    if (!text) {
-      return;
-    }
-
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      window.speechSynthesis.speak(utterance);
-    }
-
-    return () => {
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-    };
-  }, [text]);
-
-  return (
-    <div
-      style={{
-        padding: '12px',
-        margin: '12px 0',
-        background: rgbaFromHex(primaryColor, 0.18),
-        borderRadius: '10px',
-        border: `1px solid ${rgbaFromHex(primaryColor, 0.35)}`,
-      }}
-    >
-      <strong style={{ color: primaryColor }}>Audio prompt:</strong>
-      <div>{text}</div>
-    </div>
-  );
-};
-
 function App() {
   const [ui, setUi] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
@@ -276,9 +241,10 @@ function App() {
             {props.label}
           </label>
         );
-      case 'speak':
-        return <SpeakCue text={props.text || props.content} primaryColor={primaryColor} />;
       default:
+        if (type) {
+          console.warn(`Unsupported UI component '${type}' received; ignoring.`);
+        }
         return null;
     }
   };
