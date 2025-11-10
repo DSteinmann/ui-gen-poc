@@ -21,7 +21,7 @@ $Services = @(
     @{ Name = "core-system"; Path = "packages/core-system"; Command = "npm start" }
     @{ Name = "knowledge-base"; Path = "packages/knowledge-base"; Command = "npm start" }
     @{ Name = "capability-system"; Path = "packages/capability-system"; Command = "npm start" }
-    @{ Name = "device-api"; Path = "packages/device"; Command = "npm start" }
+    @{ Name = "device-api"; Path = "packages/device"; Command = "node server.js" }
     @{ Name = "device-ui"; Path = "packages/device"; Command = "npm run dev" }
 )
 
@@ -50,6 +50,7 @@ function Start-ServiceProcess($svc) {
     }
 
     $logFile = Get-LogFile $svc.Name
+    if (Test-Path $logFile) { Remove-Item $logFile -ErrorAction SilentlyContinue }
     $serviceDir = Join-Path $RootDir $svc.Path
     Write-Output "[start] $($svc.Name) -> $($svc.Command)"
 
@@ -79,7 +80,19 @@ function Stop-ServiceProcess($svc) {
     if ($process) {
         Write-Output "[stop] $($svc.Name) (PID $pid)"
         try {
-            Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+            Stop-Process -Id $pid -ErrorAction SilentlyContinue
+            $waited = $false
+            for ($i = 0; $i -lt 10; $i++) {
+                Start-Sleep -Milliseconds 500
+                if (-not (Get-Process -Id $pid -ErrorAction SilentlyContinue)) {
+                    $waited = $true
+                    break
+                }
+            }
+            if (Get-Process -Id $pid -ErrorAction SilentlyContinue) {
+                Write-Output "[stop] $($svc.Name) still running; forcing termination"
+                Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+            }
         } catch {
             Write-Verbose $_
         }
@@ -107,6 +120,7 @@ function Status-ServiceProcess($svc) {
 
 switch ($Command) {
     "start" {
+        Get-ChildItem -Path $LogDir -Filter *.log -ErrorAction SilentlyContinue | Remove-Item -ErrorAction SilentlyContinue
         foreach ($svc in $Services) { Start-ServiceProcess $svc }
         Write-Output "Logs live in $LogDir."
     }
@@ -115,6 +129,7 @@ switch ($Command) {
     }
     "restart" {
         foreach ($svc in $Services) { Stop-ServiceProcess $svc }
+        Get-ChildItem -Path $LogDir -Filter *.log -ErrorAction SilentlyContinue | Remove-Item -ErrorAction SilentlyContinue
         foreach ($svc in $Services) { Start-ServiceProcess $svc }
         Write-Output "Logs live in $LogDir."
     }
