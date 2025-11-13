@@ -33,30 +33,6 @@ const registerWithServiceRegistry = async () => {
   }
 };
 
-const deviceThingDescription = {
-  title: 'GenUI Light Switch Controller',
-  description: 'Smartphone-based UI to control a networked light switch.',
-  properties: {
-    status: {
-      type: 'string',
-      enum: ['on', 'off'],
-      description: 'Current state of the controlled light switch.',
-    },
-  },
-  actions: {
-    turnOn: {
-      description: 'Turn the light switch on.',
-    },
-    turnOff: {
-      description: 'Turn the light switch off.',
-    },
-    toggle: {
-      description: 'Toggle the light switch state.',
-    },
-  },
-  uiModalities: ['visual'],
-};
-
 const defaultPrompt = 'Provide controls for a connected light switch including status feedback. Prioritize clear touch-friendly elements that work well on a smartphone display. If the requirement knowledge base includes a preferred primary color, set the UI theme.primaryColor to that value so the interface is personalized.';
 
 const uiSchema = {
@@ -91,7 +67,7 @@ const registerWithCoreSystem = async () => {
     id: deviceId,
     name: 'Smartphone Controller',
     url: devicePublicUrl,
-    thingDescription: deviceThingDescription,
+    thingId: 'thing-light-switch-001',
     capabilities: ['userActivity'],
     metadata: {
       deviceType: 'smartphone',

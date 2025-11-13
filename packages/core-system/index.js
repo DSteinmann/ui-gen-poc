@@ -30,6 +30,7 @@ const capabilityAliasIndex = new Map();
 const deviceRegistry = new Map();
 const deviceSockets = new Map(); // deviceId -> Set<WebSocket>
 const latestUiByDevice = new Map(); // deviceId -> last generated UI definition
+const thingRegistry = new Map(); // thingId -> { id, description, metadata, registeredAt }
 
 const nowIsoString = () => new Date().toISOString();
 
@@ -159,6 +160,12 @@ const registrySnapshot = () => ({
   capabilities: Array.from(serviceRegistryByType.capability.values()),
   devices: Array.from(serviceRegistryByType.device.values()),
   services: Array.from(serviceRegistryByType.generic.values()),
+  things: Array.from(thingRegistry.values()).map((thing) => ({
+    id: thing.id,
+    metadata: thing.metadata,
+    registeredAt: thing.registeredAt,
+    lastHeartbeat: thing.lastHeartbeat,
+  })),
 });
 
 const scoreDeviceForCapabilities = (device, desiredCapabilities = []) => {
@@ -518,7 +525,16 @@ const generateUiForDevice = async ({
     resolvedSchema.name = targetDevice.id;
   }
 
-  const resolvedThingDescription = thingDescription || targetDevice?.thingDescription || null;
+  let resolvedThingDescription = thingDescription || null;
+  if (!resolvedThingDescription && targetDevice?.thingDescription) {
+    resolvedThingDescription = targetDevice.thingDescription;
+  }
+  if (!resolvedThingDescription && targetDevice?.thingId) {
+    const registeredThing = thingRegistry.get(targetDevice.thingId);
+    if (registeredThing && registeredThing.description) {
+      resolvedThingDescription = registeredThing.description;
+    }
+  }
 
   const { capabilityData, missingCapabilities } = await collectCapabilityData(resolvedCapabilities, {
     prompt: resolvedPrompt,
@@ -770,8 +786,28 @@ app.post('/register/capability', (req, res) => {
   res.json({ status: 'registered', capability: record });
 });
 
+app.post('/register/thing', (req, res) => {
+  const { id, description, metadata = {}, lastHeartbeat } = req.body || {};
+
+  if (!id || !description) {
+    return res.status(400).json({ error: 'Thing registration requires `id` and `description`.' });
+  }
+
+  const record = {
+    id,
+    description,
+    metadata,
+    registeredAt: nowIsoString(),
+    lastHeartbeat: lastHeartbeat || nowIsoString(),
+  };
+
+  thingRegistry.set(id, record);
+  console.log(`Thing registered: ${id}`);
+  res.json({ status: 'registered', thing: record });
+});
+
 app.post('/register/device', (req, res) => {
-  const { id, name, url, thingDescription, capabilities = [], metadata = {}, uiSchema, defaultPrompt } = req.body;
+  const { id, name, url, thingId, thingDescription, capabilities = [], metadata = {}, uiSchema, defaultPrompt } = req.body;
 
   if (!id || !name) {
     return res.status(400).json({ error: 'Device registration requires `id` and `name`.' });
@@ -782,6 +818,7 @@ app.post('/register/device', (req, res) => {
     name,
     url: url ? normalizeUrl(url) : undefined,
     thingDescription,
+    thingId,
     capabilities: Array.isArray(capabilities) ? capabilities : [],
     metadata,
     uiSchema: uiSchema || metadata.uiSchema || null,

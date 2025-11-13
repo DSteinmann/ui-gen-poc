@@ -85,6 +85,22 @@ services:
       - core-system
     restart: unless-stopped
 
+  things:
+    build:
+      context: .
+      dockerfile: packages/things/Dockerfile
+    environment:
+      THINGS_PORT: 3006
+      THINGS_PUBLIC_URL: http://things:3006
+      CORE_SYSTEM_URL: http://core-system:3001
+      SERVICE_REGISTRY_URL: http://core-system:3000
+      BIND_ADDRESS: 0.0.0.0
+    ports:
+      - "3006:3006"
+    depends_on:
+      - core-system
+    restart: unless-stopped
+
 
 volumes:
   knowledge-base-data:
