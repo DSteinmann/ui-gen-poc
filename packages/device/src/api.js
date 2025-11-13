@@ -33,8 +33,6 @@ const registerWithServiceRegistry = async () => {
   }
 };
 
-const defaultPrompt = 'Provide controls for a connected light switch including status feedback. Prioritize clear touch-friendly elements that work well on a smartphone display. If the requirement knowledge base includes a preferred primary color, set the UI theme.primaryColor to that value so the interface is personalized.';
-
 const uiSchema = {
   name: 'smartphone-light-switch-ui',
   components: {
@@ -76,10 +74,8 @@ const registerWithCoreSystem = async () => {
       supportsTouch: true,
       supportsTheming: ['theme.primaryColor'],
       supportedTools: ['getUserActivity'],
-      defaultPrompt,
       uiSchema,
     },
-    defaultPrompt,
     uiSchema,
   };
 

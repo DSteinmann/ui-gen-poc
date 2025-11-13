@@ -3,6 +3,9 @@ import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
 import fetch from 'node-fetch';
+import { readFileSync } from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const app = express();
 app.use(express.json());
@@ -14,12 +17,17 @@ const wss = new WebSocketServer({ server });
 const port = Number.parseInt(process.env.CORE_SYSTEM_PORT || '3001', 10);
 const registryPort = Number.parseInt(process.env.SERVICE_REGISTRY_PORT || '3000', 10);
 const uiRefreshIntervalMs = 60000;
-const fallbackPrompt = 'Generate an adaptive interface for the registered device.';
+const fallbackPrompt = 'Analyze the registered devices, their schemas, and capabilities. Select the best-suited target automatically, then design a responsive UI with clear state feedback and appropriate theming cues for the referenced thing.';
 const corePublicUrl = process.env.CORE_SYSTEM_PUBLIC_URL || `http://localhost:${port}`;
 const registryPublicUrl = process.env.SERVICE_REGISTRY_PUBLIC_URL || `http://localhost:${registryPort}`;
 const serviceRegistryUrl = process.env.SERVICE_REGISTRY_URL || registryPublicUrl;
 const knowledgeBaseUrl = process.env.KNOWLEDGE_BASE_URL || 'http://localhost:3005';
 const listenAddress = process.env.BIND_ADDRESS || '0.0.0.0';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const promptsDir = path.resolve(__dirname, 'prompts');
+let cachedGeneralDefaultPrompt;
 
 const serviceRegistryByType = {
   generic: new Map(),
@@ -718,6 +726,27 @@ registryApp.post('/register', (req, res) => {
   }
 });
 
+const loadGeneralDefaultPrompt = () => {
+  if (cachedGeneralDefaultPrompt !== undefined) {
+    return cachedGeneralDefaultPrompt;
+  }
+
+  try {
+    const promptPath = path.join(promptsDir, 'ui-default.prompt.txt');
+    const content = readFileSync(promptPath, 'utf-8').trim();
+    cachedGeneralDefaultPrompt = content.length > 0 ? content : null;
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.warn(`[Core] Failed to load shared default prompt: ${error.message}`);
+    }
+    cachedGeneralDefaultPrompt = null;
+  }
+
+  return cachedGeneralDefaultPrompt;
+};
+
+const getGeneralDefaultPrompt = () => loadGeneralDefaultPrompt();
+
 const findService = (name) => {
   return (
     serviceRegistryByType.generic.get(name) ||
@@ -813,6 +842,8 @@ app.post('/register/device', (req, res) => {
     return res.status(400).json({ error: 'Device registration requires `id` and `name`.' });
   }
 
+  const resolvedDefaultPrompt = defaultPrompt || metadata.defaultPrompt || getGeneralDefaultPrompt() || fallbackPrompt;
+
   const record = {
     id,
     name,
@@ -822,7 +853,7 @@ app.post('/register/device', (req, res) => {
     capabilities: Array.isArray(capabilities) ? capabilities : [],
     metadata,
     uiSchema: uiSchema || metadata.uiSchema || null,
-    defaultPrompt: defaultPrompt || metadata.defaultPrompt || null,
+    defaultPrompt: resolvedDefaultPrompt || null,
     registeredAt: nowIsoString(),
     lastHeartbeat: nowIsoString(),
   };
