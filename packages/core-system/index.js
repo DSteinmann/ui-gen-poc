@@ -295,9 +295,11 @@ const selectDeviceViaKnowledgeBase = async ({
       metadata: {
         deviceType: device.metadata?.deviceType,
         supportsAudio: device.metadata?.supportsAudio || false,
+        supportsDictation: device.metadata?.supportsDictation || false,
         supportsTouch: device.metadata?.supportsTouch || false,
         supportsTheming: device.metadata?.supportsTheming || [],
         supportedUiComponents: device.metadata?.supportedUiComponents || [],
+        modalityPreference: device.metadata?.modalityPreference || null,
       },
       uiSchema: device.uiSchema
         ? {

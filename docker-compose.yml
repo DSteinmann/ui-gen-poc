@@ -85,5 +85,6 @@ services:
       - core-system
     restart: unless-stopped
 
+
 volumes:
   knowledge-base-data:

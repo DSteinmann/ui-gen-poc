@@ -242,9 +242,6 @@ function App() {
           </label>
         );
       default:
-        if (type) {
-          console.warn(`Unsupported UI component '${type}' received; ignoring.`);
-        }
         return null;
     }
   };

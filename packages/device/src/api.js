@@ -90,13 +90,13 @@ const registerWithCoreSystem = async () => {
   const deviceRegistrationPayload = {
     id: deviceId,
     name: 'Smartphone Controller',
-  url: devicePublicUrl,
+    url: devicePublicUrl,
     thingDescription: deviceThingDescription,
     capabilities: ['userActivity'],
     metadata: {
       deviceType: 'smartphone',
-  supportedUiComponents: ['text', 'button', 'toggle'],
-  supportsAudio: false,
+      supportedUiComponents: ['text', 'button', 'toggle'],
+      supportsAudio: false,
       supportsTouch: true,
       supportsTheming: ['theme.primaryColor'],
       supportedTools: ['getUserActivity'],

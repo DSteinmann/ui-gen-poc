@@ -278,7 +278,9 @@ const runDeviceSelection = async ({
         `Capabilities: ${(candidate.capabilities || []).join(', ') || 'none'}`,
         `Supported components: ${supportedComponents}`,
         `Supports audio: ${candidate.metadata?.supportsAudio ? 'yes' : 'no'}`,
+        `Supports dictation: ${candidate.metadata?.supportsDictation ? 'yes' : 'no'}`,
         `Supports theming: ${Array.isArray(candidate.metadata?.supportsTheming) ? candidate.metadata.supportsTheming.join(', ') : 'no'}`,
+        `Modality preference: ${candidate.metadata?.modalityPreference || 'unspecified'}`,
         `Capability match: ${matchSummary}`,
       ];
 
