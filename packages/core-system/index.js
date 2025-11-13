@@ -64,6 +64,63 @@ const normalizeEndpoints = (endpoints = {}, directEndpoint) => {
   return normalized;
 };
 
+const resolveCapabilityRecord = (capabilityName) => {
+  if (!capabilityName) {
+    return null;
+  }
+
+  const moduleName = capabilityAliasIndex.get(capabilityName) || capabilityName;
+  return serviceRegistryByType.capability.get(moduleName) || null;
+};
+
+const summarizeCapabilitiesForPrompt = (capabilityNames = []) => {
+  const uniqueCapabilities = Array.from(new Set(capabilityNames.filter(Boolean)));
+  if (uniqueCapabilities.length === 0) {
+    return 'No supplementary capabilities are available beyond the device itself.';
+  }
+
+  const summaries = uniqueCapabilities.map((capabilityName) => {
+    const record = resolveCapabilityRecord(capabilityName);
+    if (!record) {
+      return `- ${capabilityName}: not currently registered; avoid referencing this capability.`;
+    }
+
+    const parts = [`- ${capabilityName}: provided by service '${record.name}' at ${record.url}`];
+
+    if (record.metadata?.description) {
+      parts.push(`  • Description: ${record.metadata.description}`);
+    }
+
+    if (record.endpoints?.default) {
+      const { method = 'GET', path: endpointPath = '/' } = record.endpoints.default;
+      parts.push(`  • Default endpoint: ${method.toUpperCase()} ${composeUrl(record.url, endpointPath)}`);
+    }
+
+    const toolEntries = record.tools && typeof record.tools === 'object'
+      ? Object.entries(record.tools)
+      : [];
+
+    if (toolEntries.length > 0) {
+      const toolLines = toolEntries.map(([toolName, descriptor]) => {
+        if (!descriptor || typeof descriptor !== 'object') {
+          return `    - ${toolName}`;
+        }
+
+        const { description, method = 'GET', path: endpointPath = '' } = descriptor;
+        const resolvedUrl = descriptor.url || composeUrl(record.url, endpointPath || '/');
+        const descLine = description ? ` — ${description}` : '';
+        return `    - ${toolName} (${method.toUpperCase()} ${resolvedUrl})${descLine}`;
+      });
+      parts.push('  • LLM-callable tools:');
+      parts.push(...toolLines);
+    }
+
+    return parts.join('\n');
+  });
+
+  return summaries.join('\n');
+};
+
 const composeUrl = (base, path = '/') => {
   if (!path || path === '/') return base;
   return `${base}${path.startsWith('/') ? path : `/${path}`}`;
@@ -100,8 +157,7 @@ const collectCapabilityData = async (requestedCapabilities = [], context = {}) =
 
   await Promise.all(
     requestedCapabilities.map(async (capabilityName) => {
-      const moduleName = capabilityAliasIndex.get(capabilityName) || capabilityName;
-  const moduleRecord = serviceRegistryByType.capability.get(moduleName);
+      const moduleRecord = resolveCapabilityRecord(capabilityName);
 
       if (!moduleRecord) {
         missingCapabilities.push(capabilityName);
@@ -252,6 +308,7 @@ const buildDynamicPrompt = ({
   desiredCapabilities = [],
   selectionReason,
   selectionScore,
+  capabilitySummary,
 }) => {
   const deviceSummaries = Array.from(deviceRegistry.values()).map((device) => {
     const supportedComponents = Array.isArray(device.metadata?.supportedUiComponents)
@@ -276,6 +333,11 @@ const buildDynamicPrompt = ({
     ? `Selection reason: ${selectionReason}${selectionScore?.missing?.length ? ` (missing capabilities: ${selectionScore.missing.join(', ')})` : ''}.`
     : 'Selection reason: not provided.';
 
+  const capabilityClauseDetailed = capabilitySummary
+    ? `Registered capabilities available to augment the UI:
+${capabilitySummary}`
+    : null;
+
   return [
     basePrompt,
     '---',
@@ -284,6 +346,7 @@ const buildDynamicPrompt = ({
     capabilityClause,
     `Target device for this UI: ${targetSummary}.`,
     selectionClause,
+    capabilityClauseDetailed,
     'Make sure the generated UI is tailored to the target device and its capabilities.',
   ]
     .filter(Boolean)
@@ -508,19 +571,25 @@ const generateUiForDevice = async ({
   const selectionScore = scoreDeviceForCapabilities(targetDevice, requestedCapabilities);
   selectionMeta.score = selectionScore;
 
-  const resolvedCapabilities = requestedCapabilities.length > 0
+  let resolvedCapabilities = requestedCapabilities.length > 0
     ? requestedCapabilities
     : Array.isArray(targetDevice.capabilities)
       ? targetDevice.capabilities
       : [];
 
+  if (!resolvedCapabilities || resolvedCapabilities.length === 0) {
+    resolvedCapabilities = Array.from(capabilityAliasIndex.keys());
+  }
+
   const basePromptForUi = prompt || targetDevice?.defaultPrompt || fallbackPrompt;
+  const capabilitySummary = summarizeCapabilitiesForPrompt(resolvedCapabilities);
   const resolvedPrompt = buildDynamicPrompt({
     basePrompt: basePromptForUi,
     targetDevice,
     desiredCapabilities: resolvedCapabilities,
     selectionReason: selectionMeta.reason,
     selectionScore,
+    capabilitySummary,
   });
 
   const resolvedSchema = schema && Object.keys(schema).length > 0
@@ -531,6 +600,59 @@ const generateUiForDevice = async ({
 
   if (!resolvedSchema.name) {
     resolvedSchema.name = targetDevice.id;
+  }
+
+  const capabilityTools = {};
+  resolvedCapabilities.forEach((capabilityName) => {
+    const capabilityRecord = resolveCapabilityRecord(capabilityName);
+    if (!capabilityRecord?.tools) {
+      return;
+    }
+
+    Object.entries(capabilityRecord.tools).forEach(([toolName, descriptor]) => {
+      if (!descriptor || typeof descriptor !== 'object') {
+        return;
+      }
+
+      const toolDescriptor = { ...descriptor };
+      toolDescriptor.capability = toolDescriptor.capability || capabilityName;
+      toolDescriptor.service = toolDescriptor.service || capabilityRecord.name;
+
+      if (!toolDescriptor.url) {
+        if (toolDescriptor.path) {
+          toolDescriptor.url = composeUrl(capabilityRecord.url, toolDescriptor.path);
+        } else {
+          toolDescriptor.url = capabilityRecord.url;
+        }
+      }
+
+      capabilityTools[toolName] = toolDescriptor;
+    });
+  });
+
+  const existingToolConfig = resolvedSchema && typeof resolvedSchema === 'object' && resolvedSchema.tools && typeof resolvedSchema.tools === 'object'
+    ? { ...resolvedSchema.tools }
+    : {};
+
+  const mergedToolConfig = Object.keys(capabilityTools).length > 0 || Object.keys(existingToolConfig).length > 0
+    ? { ...capabilityTools, ...existingToolConfig }
+    : {};
+
+  if (Object.keys(mergedToolConfig).length > 0) {
+    resolvedSchema.tools = mergedToolConfig;
+  } else if (resolvedSchema.tools) {
+    delete resolvedSchema.tools;
+  }
+
+  if (Object.keys(mergedToolConfig).length > 0) {
+    const toolCapabilitySet = new Set(resolvedCapabilities);
+    Object.values(mergedToolConfig).forEach((toolDescriptor) => {
+      const capabilityName = toolDescriptor?.capability || toolDescriptor?.capabilityAlias || toolDescriptor?.provides;
+      if (capabilityName) {
+        toolCapabilitySet.add(capabilityName);
+      }
+    });
+    resolvedCapabilities = Array.from(toolCapabilitySet);
   }
 
   let resolvedThingDescription = thingDescription || null;
@@ -550,7 +672,7 @@ const generateUiForDevice = async ({
     device: targetDevice,
   });
 
-  const toolConfig = (targetDevice?.uiSchema && typeof targetDevice.uiSchema === 'object') ? targetDevice.uiSchema.tools || {} : {};
+  const toolConfig = (resolvedSchema && typeof resolvedSchema === 'object') ? resolvedSchema.tools || {} : {};
   const capabilityToolHints = {};
   Object.entries(toolConfig).forEach(([toolName, config]) => {
     if (config && typeof config === 'object') {
@@ -780,7 +902,7 @@ app.get('/registry', (_req, res) => {
 });
 
 app.post('/register/capability', (req, res) => {
-  const { name, url, provides = [], metadata = {}, endpoints = {}, endpoint, defaultEndpoint } = req.body;
+  const { name, url, provides = [], metadata = {}, endpoints = {}, endpoint, defaultEndpoint, tools = {} } = req.body;
 
   if (!name || !url) {
     return res.status(400).json({ error: 'Capability registration requires `name` and `url`.' });
@@ -794,6 +916,7 @@ app.post('/register/capability', (req, res) => {
   }
 
   const normalizedEndpoints = normalizeEndpoints(endpoints, endpoint || defaultEndpoint);
+  const normalizedTools = tools && typeof tools === 'object' ? tools : {};
 
   const record = {
     name,
@@ -801,6 +924,7 @@ app.post('/register/capability', (req, res) => {
     provides: Array.isArray(provides) ? provides : [],
     metadata,
     endpoints: normalizedEndpoints,
+    tools: normalizedTools,
     registeredAt: nowIsoString(),
     lastHeartbeat: nowIsoString(),
   };

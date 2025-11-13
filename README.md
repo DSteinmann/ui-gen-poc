@@ -12,7 +12,7 @@ The project is composed of three main components:
 
 ## Running with Docker Compose
 
-The repository now ships with a Docker Compose workflow that launches all project services (core-system + registry, knowledge-base, capability-system, device API, and device UI) in a single command.
+The repository now ships with a Docker Compose workflow that launches all project services (core-system + registry, knowledge-base, activity-recognition, device API, and device UI) in a single command.
 
 1. Ensure Docker is installed and running. If you are using LM Studio or another model host, expose it at `http://localhost:1234/v1/chat/completions` or update the `LLM_ENDPOINT` environment variable before starting the stack.
 2. From the repository root, build and start the services:
@@ -27,7 +27,7 @@ The repository now ships with a Docker Compose workflow that launches all projec
    - Service registry API: `http://localhost:3000`
    - Core system UI orchestration API: `http://localhost:3001`
    - Knowledge base: `http://localhost:3005`
-   - Capability service (user activity sensor): `http://localhost:3003`
+   - Activity recognition service: `http://localhost:3003`
    - Device API service: `http://localhost:3002`
    - Device UI preview (Vite dev server): `http://localhost:5173`
 

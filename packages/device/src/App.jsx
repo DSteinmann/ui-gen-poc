@@ -23,7 +23,7 @@ const resolveWebsocketUrl = () => {
         const browserHost = window.location.hostname || 'localhost';
         const dockerOnlyHosts = new Set([
           'core-system',
-          'capability-system',
+          'activity-recognition',
           'knowledge-base',
           'device-api',
           'device-ui',

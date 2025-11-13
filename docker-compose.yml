@@ -37,13 +37,13 @@ services:
       - core-system
     restart: unless-stopped
 
-  capability-system:
+  activity-recognition:
     build:
       context: .
-      dockerfile: packages/capability-system/Dockerfile
+      dockerfile: packages/activity-recognition/Dockerfile
     environment:
-      CAPABILITY_PORT: 3003
-      CAPABILITY_PUBLIC_URL: http://capability-system:3003
+      ACTIVITY_RECOGNITION_PORT: 3003
+      ACTIVITY_RECOGNITION_PUBLIC_URL: http://activity-recognition:3003
       CORE_SYSTEM_URL: http://core-system:3001
       SERVICE_REGISTRY_URL: http://core-system:3000
       BIND_ADDRESS: 0.0.0.0

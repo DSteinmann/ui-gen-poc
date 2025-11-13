@@ -20,7 +20,7 @@ if (!(Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir | Out-Nul
 $Services = @(
     @{ Name = "core-system"; Path = "packages/core-system"; Command = "npm start" }
     @{ Name = "knowledge-base"; Path = "packages/knowledge-base"; Command = "npm start" }
-    @{ Name = "capability-system"; Path = "packages/capability-system"; Command = "npm start" }
+    @{ Name = "activity-recognition"; Path = "packages/activity-recognition"; Command = "npm start" }
     @{ Name = "device-api"; Path = "packages/device"; Command = "node server.js" }
     @{ Name = "device-ui"; Path = "packages/device"; Command = "npm run dev" }
 )

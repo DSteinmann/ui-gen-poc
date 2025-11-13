@@ -40,15 +40,6 @@ const uiSchema = {
     button: { description: 'Action button triggering remote actions.' },
     toggle: { description: 'Switch element representing light state.' },
   },
-  tools: {
-    getUserActivity: {
-      description: 'Retrieve the latest user activity state from the activity sensor capability.',
-      service: 'user-activity-sensor',
-      capability: 'userActivity',
-      path: '/activity',
-      method: 'GET',
-    },
-  },
   theming: {
     description: 'Supports root `theme.primaryColor` (hex color) for accent styling.',
     supportsPrimaryColor: true,
@@ -66,14 +57,13 @@ const registerWithCoreSystem = async () => {
     name: 'Smartphone Controller',
     url: devicePublicUrl,
     thingId: 'thing-light-switch-001',
-    capabilities: ['userActivity'],
+  capabilities: [],
     metadata: {
       deviceType: 'smartphone',
       supportedUiComponents: ['text', 'button', 'toggle'],
       supportsAudio: false,
       supportsTouch: true,
       supportsTheming: ['theme.primaryColor'],
-      supportedTools: ['getUserActivity'],
       uiSchema,
     },
     uiSchema,

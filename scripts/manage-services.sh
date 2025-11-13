@@ -9,7 +9,7 @@ mkdir -p "${PID_DIR}" "${LOG_DIR}"
 SERVICES=(
   "core-system:packages/core-system:npm start"
   "knowledge-base:packages/knowledge-base:npm start"
-  "capability-system:packages/capability-system:npm start"
+  "activity-recognition:packages/activity-recognition:npm start"
   "device-api:packages/device:node server.js"
   "device-ui:packages/device:npm run dev"
 )
@@ -18,7 +18,7 @@ service_ports() {
   case "$1" in
     core-system) echo "3000,3001" ;;
     knowledge-base) echo "3005" ;;
-    capability-system) echo "3003" ;;
+  activity-recognition) echo "3003" ;;
     device-api) echo "3002" ;;
     device-ui) echo "5173" ;;
     *) echo "" ;;
