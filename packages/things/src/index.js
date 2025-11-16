@@ -171,9 +171,7 @@ const applyLightSwitchState = (nextState, reason) => {
   const previousState = lightSwitchState;
   lightSwitchState = nextState;
 
-  if (previousState !== nextState) {
-    console.log(`[Things] Light switch state changed from '${previousState}' to '${nextState}' via ${reason}`);
-  }
+  console.log(`[Things] Light switch request '${reason}': ${previousState} -> ${nextState}`);
 
   return {
     previousState,
@@ -194,6 +192,7 @@ app.get('/things/:id', (req, res) => {
 });
 
 app.get('/light-switch/status', (_req, res) => {
+  console.log('[Things] Status read request received.');
   res.json(buildLightSwitchStatusPayload());
 });
 
@@ -205,23 +204,23 @@ app.put('/light-switch/status', (req, res) => {
   }
 
   const payload = applyLightSwitchState(status, 'property.write');
-  res.json(payload);
+  res.json({ message: `Status set to '${status}'.`, ...payload });
 });
 
 app.post('/light-switch/actions/turnOn', (_req, res) => {
   const payload = applyLightSwitchState('on', 'action.turnOn');
-  res.json(payload);
+  res.json({ message: 'Turn on invoked.', ...payload });
 });
 
 app.post('/light-switch/actions/turnOff', (_req, res) => {
   const payload = applyLightSwitchState('off', 'action.turnOff');
-  res.json(payload);
+  res.json({ message: 'Turn off invoked.', ...payload });
 });
 
 app.post('/light-switch/actions/toggle', (_req, res) => {
   const nextState = lightSwitchState === 'on' ? 'off' : 'on';
   const payload = applyLightSwitchState(nextState, 'action.toggle');
-  res.json(payload);
+  res.json({ message: `Toggle invoked, new state '${nextState}'.`, ...payload });
 });
 
 app.listen(port, listenAddress, () => {
