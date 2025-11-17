@@ -12,6 +12,23 @@ const devicePublicUrl = process.env.VOICE_DEVICE_PUBLIC_URL || `http://localhost
 const thingsBaseUrl = process.env.LIGHT_SWITCH_BASE_URL || 'http://localhost:3006/light-switch';
 const recognitionLanguage = process.env.VOICE_DEVICE_LANG || 'en-US';
 
+const deriveCoreWebsocketUrl = () => {
+  if (process.env.CORE_SYSTEM_WS_URL) {
+    return process.env.CORE_SYSTEM_WS_URL;
+  }
+
+  try {
+    const parsed = new URL(coreSystemUrl);
+    parsed.protocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
+    return parsed.toString();
+  } catch (error) {
+    console.warn('[Voice Device] Failed to derive core websocket URL from CORE_SYSTEM_URL, defaulting to ws://localhost:3001');
+    return 'ws://localhost:3001';
+  }
+};
+
+const coreWebsocketUrl = deriveCoreWebsocketUrl();
+
 const deviceId = process.env.VOICE_DEVICE_ID || 'device-voice-headset-001';
 const deviceName = process.env.VOICE_DEVICE_NAME || 'Hands-free Voice Controller';
 
@@ -148,6 +165,7 @@ app.get('/api/config', (_req, res) => {
     deviceId,
     deviceName,
     recognitionLanguage,
+    coreWebsocketUrl,
     sampleCommands: [
       'Turn on the light',
       'Turn off the light',

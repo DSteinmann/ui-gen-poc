@@ -143,6 +143,7 @@ const persistDocuments = (docs) => {
 };
 
 const documents = loadDocuments();
+let lastDeviceSelection = null;
 
 const addDocument = ({ id, content, metadata = {}, tags = [] }) => {
   if (!content || typeof content !== 'string') {
@@ -376,7 +377,22 @@ const runDeviceSelection = async ({
       throw new Error('Unable to parse device selection response.');
     }
 
-    console.log(`[KB] Device selection chose '${parsed?.targetDeviceId || 'unknown'}' with confidence ${parsed?.confidence || 'unspecified'}.`);
+    console.log(`[KB] Device selection chose '${parsed?.targetDeviceId || 'unknown'}' with confidence ${parsed?.confidence || 'unspecified'}'. Reason: ${parsed?.reason || 'n/a'}`);
+
+    lastDeviceSelection = {
+      timestamp: nowIsoString(),
+      request: {
+        prompt,
+        fallbackPrompt,
+        desiredCapabilities,
+        thingDescription,
+        candidates,
+        model,
+        candidateSummaries,
+        knowledgeContext,
+      },
+      response: parsed,
+    };
 
     return parsed;
   };
@@ -460,6 +476,30 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
     });
   }
 
+  const activityDetails = capabilityData?.userActivity || {};
+  const activitySample = activityDetails.data || activityDetails.cachedSample || null;
+  const activityState = activitySample?.id || activitySample?.state || null;
+  const selectionHint = selection?.reason ? selection.reason.toLowerCase() : '';
+  const selectionContext = selection?.raw ? JSON.stringify(selection.raw).toLowerCase() : '';
+
+    const impliesHandsFree = selectionHint.includes('hands-free')
+      || selectionHint.includes('touch')
+      || selectionContext.includes('hands-free')
+      || selectionContext.includes('touch');
+
+    if (impliesHandsFree || activityState === 'hands-free') {
+      messages.push({
+        role: 'system',
+        content: 'Current context indicates the user is hands-free. Avoid presenting warnings about hands being occupied or forcing voice interactions. Provide touch-friendly controls and only mention voice input as an optional enhancement.',
+      });
+    }
+
+    if (activityState === 'hands-occupied') {
+      messages.push({
+        role: 'system',
+        content: 'Current activity is hands-occupied. Offer voice-first guidance and minimize the need for touch input.',
+      });
+    }
   if (uiSchema.theming?.supportsPrimaryColor) {
     messages.push({
       role: 'system',
@@ -610,6 +650,7 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
           }
         }
 
+        const hasExplicitUrl = Boolean(toolDefinition.url);
         let serviceUrl = toolDefinition.url;
         if (!serviceUrl && toolDefinition.service) {
           try {
@@ -643,7 +684,9 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
         }
 
         const endpointPath = toolDefinition.path || toolDefinition.endpoint || '';
-        const requestUrl = composeToolUrl(serviceUrl, endpointPath);
+        const requestUrl = !hasExplicitUrl && endpointPath
+          ? composeToolUrl(serviceUrl, endpointPath)
+          : serviceUrl;
         const method = (toolDefinition.method || 'GET').toUpperCase();
         const headers = { ...(toolDefinition.headers || {}) };
         const requestInit = { method, headers };
@@ -743,6 +786,14 @@ app.post('/documents', (req, res) => {
   }
 });
 
+app.get('/debug/last-device-selection', (req, res) => {
+  if (!lastDeviceSelection) {
+    return res.status(404).json({ error: 'No device selection has been recorded yet.' });
+  }
+
+  res.json(lastDeviceSelection);
+});
+
 app.post('/select-device', async (req, res) => {
   const {
     prompt,
@@ -770,7 +821,7 @@ app.post('/select-device', async (req, res) => {
 });
 
 app.post('/query', async (req, res) => {
-  const { prompt, thingDescription, capabilities, schema, capabilityData, missingCapabilities, device, deviceId } = req.body;
+  const { prompt, thingDescription, capabilities, schema, capabilityData, missingCapabilities, device, deviceId, selection } = req.body;
   console.log('[KB] /query invoked', {
     promptPreview: typeof prompt === 'string' ? `${prompt.slice(0, 60)}${prompt.length > 60 ? '…' : ''}` : null,
     capabilities,
@@ -785,8 +836,9 @@ app.post('/query', async (req, res) => {
       uiSchema: schema || {},
       capabilityData,
       missingCapabilities,
-      device,
-      deviceId,
+  device,
+  deviceId,
+  selection,
     });
 
     if (!generatedUi || Object.keys(generatedUi).length === 0) {
