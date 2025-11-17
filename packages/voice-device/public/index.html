@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Voice Headset Controller</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Voice Headset Controller</h1>
+        <p id="device-description">Preparing voice interface…</p>
+      </header>
+
+      <section class="status-panel">
+        <div class="status-item">
+          <span class="label">Listening:</span>
+          <span id="listening-indicator" class="value">inactive</span>
+        </div>
+        <div class="status-item">
+          <span class="label">Last transcript:</span>
+          <span id="last-transcript" class="value">—</span>
+        </div>
+        <div class="status-item">
+          <span class="label">Last action:</span>
+          <span id="last-action" class="value">—</span>
+        </div>
+        <div class="status-item">
+          <span class="label">Light status:</span>
+          <span id="light-status" class="value">unknown</span>
+        </div>
+      </section>
+
+      <section class="controls">
+        <button id="start-btn" class="primary">Start Listening</button>
+        <button id="stop-btn" disabled>Stop Listening</button>
+        <button id="check-status-btn" class="ghost">Check Light Status</button>
+      </section>
+
+      <section>
+        <h2>Command Log</h2>
+        <ul id="command-log" aria-live="polite"></ul>
+      </section>
+
+      <section>
+        <h2>Sample Phrases</h2>
+        <ul id="sample-commands"></ul>
+      </section>
+
+      <section id="unsupported" hidden>
+        <h2>Speech Recognition Unavailable</h2>
+        <p>This browser does not support the Web Speech API. Try using the latest Chrome or Edge on your phone.</p>
+      </section>
+    </main>
+
+    <script src="app.js" type="module"></script>
+  </body>
+</html>

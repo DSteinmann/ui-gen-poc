@@ -11,6 +11,10 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: nowIsoString(), registeredDevices: deviceRegistry.size });
+});
+
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 

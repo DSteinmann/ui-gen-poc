@@ -10,6 +10,10 @@ const thingsPublicUrl = process.env.THINGS_PUBLIC_URL || `http://localhost:${por
 
 app.use(express.json());
 
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', service: 'things' });
+});
+
 const lightSwitchThingId = 'thing-light-switch-001';
 const lightSwitchThingUrn = 'urn:uuid:7e3a3d1b-7a52-49df-af9a-7077b4f96942';
 

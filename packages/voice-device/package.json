@@ -1,0 +1,14 @@
+{
+  "name": "voice-device",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Hands-free voice controller device service for the IMP demo.",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "node-fetch": "^3.3.2"
+  }
+}

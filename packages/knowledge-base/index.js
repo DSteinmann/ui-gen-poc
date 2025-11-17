@@ -8,6 +8,10 @@ import { fileURLToPath } from 'url';
 const app = express();
 app.use(express.json());
 app.use(cors());
+
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', documents: documents.length });
+});
 const port = Number.parseInt(process.env.KNOWLEDGE_BASE_PORT || '3005', 10);
 const listenAddress = process.env.BIND_ADDRESS || '0.0.0.0';
 const serviceRegistryUrl = process.env.SERVICE_REGISTRY_URL || 'http://localhost:3000';

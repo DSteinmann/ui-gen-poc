@@ -16,6 +16,12 @@ services:
     ports:
       - "3001:3001"
       - "3000:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
 
   knowledge-base:
@@ -31,10 +37,17 @@ services:
       BIND_ADDRESS: 0.0.0.0
     ports:
       - "3005:3005"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3005/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     volumes:
       - knowledge-base-data:/data
     depends_on:
-      - core-system
+      core-system:
+        condition: service_healthy
     restart: unless-stopped
 
   activity-recognition:
@@ -50,7 +63,10 @@ services:
     ports:
       - "3003:3003"
     depends_on:
-      - core-system
+      core-system:
+        condition: service_healthy
+      knowledge-base:
+        condition: service_healthy
     restart: unless-stopped
 
   device-api:
@@ -67,7 +83,10 @@ services:
     ports:
       - "3002:3002"
     depends_on:
-      - core-system
+      core-system:
+        condition: service_healthy
+      knowledge-base:
+        condition: service_healthy
     restart: unless-stopped
 
   device-ui:
@@ -82,7 +101,10 @@ services:
     ports:
       - "5173:5173"
     depends_on:
-      - core-system
+      core-system:
+        condition: service_healthy
+      knowledge-base:
+        condition: service_healthy
     restart: unless-stopped
 
   things:
@@ -97,8 +119,39 @@ services:
       BIND_ADDRESS: 0.0.0.0
     ports:
       - "3006:3006"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3006/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     depends_on:
-      - core-system
+      core-system:
+        condition: service_healthy
+      knowledge-base:
+        condition: service_healthy
+    restart: unless-stopped
+
+  voice-device:
+    build:
+      context: .
+      dockerfile: packages/voice-device/Dockerfile
+    environment:
+      VOICE_DEVICE_PORT: 3004
+      VOICE_DEVICE_PUBLIC_URL: http://voice-device:3004
+      CORE_SYSTEM_URL: http://core-system:3001
+      SERVICE_REGISTRY_URL: http://core-system:3000
+      LIGHT_SWITCH_BASE_URL: http://things:3006/light-switch
+      BIND_ADDRESS: 0.0.0.0
+    ports:
+      - "3004:3004"
+    depends_on:
+      core-system:
+        condition: service_healthy
+      knowledge-base:
+        condition: service_healthy
+      things:
+        condition: service_healthy
     restart: unless-stopped
 
 
