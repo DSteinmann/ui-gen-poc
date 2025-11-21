@@ -32,7 +32,13 @@ services:
       KNOWLEDGE_BASE_PORT: 3005
       KNOWLEDGE_BASE_PUBLIC_URL: http://knowledge-base:3005
       SERVICE_REGISTRY_URL: http://core-system:3000
-      LLM_ENDPOINT: http://192.168.1.73:1234/v1/chat/completions
+      LLM_ENDPOINT: ${LLM_ENDPOINT:-http://192.168.1.73:1234/v1/chat/completions}
+      LLM_MODEL: ${LLM_MODEL:-gemma 3b}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_API_URL: ${OPENROUTER_API_URL:-https://openrouter.ai/api/v1/chat/completions}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      OPENROUTER_APP_URL: ${OPENROUTER_APP_URL:-}
+      OPENROUTER_APP_NAME: ${OPENROUTER_APP_NAME:-IMP Requirements KB}
       KNOWLEDGE_BASE_DATA_FILE: /data/kb-data.json
       BIND_ADDRESS: 0.0.0.0
     ports:

@@ -17,6 +17,13 @@ const listenAddress = process.env.BIND_ADDRESS || '0.0.0.0';
 const serviceRegistryUrl = process.env.SERVICE_REGISTRY_URL || 'http://localhost:3000';
 const knowledgeBasePublicUrl = process.env.KNOWLEDGE_BASE_PUBLIC_URL || `http://localhost:${port}`;
 const llmEndpoint = process.env.LLM_ENDPOINT || 'http://localhost:1234/v1/chat/completions';
+const llmDefaultModel = process.env.LLM_MODEL || 'gemma 3b';
+
+const openRouterApiKey = process.env.OPENROUTER_API_KEY || null;
+const openRouterApiUrl = process.env.OPENROUTER_API_URL || 'https://openrouter.ai/api/v1/chat/completions';
+const openRouterModel = process.env.OPENROUTER_MODEL || null;
+const openRouterReferer = process.env.OPENROUTER_APP_URL || process.env.OPENROUTER_REFERER || null;
+const openRouterTitle = process.env.OPENROUTER_APP_NAME || process.env.OPENROUTER_TITLE || 'IMP Requirements KB';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -140,6 +147,83 @@ const loadDocuments = () => {
 
 const persistDocuments = (docs) => {
   fs.writeFileSync(DATA_FILE, JSON.stringify({ documents: docs }, null, 2), 'utf-8');
+};
+
+const invokeChatCompletion = async (requestBody, { contextLabel = 'llm-request' } = {}) => {
+  const effectiveModel = requestBody.model || openRouterModel || llmDefaultModel;
+  const basePayload = { ...requestBody, model: effectiveModel };
+
+  const callOpenRouter = async () => {
+    if (!openRouterApiKey) {
+      throw new Error('OpenRouter API key not configured.');
+    }
+
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${openRouterApiKey}`,
+    };
+
+    if (openRouterReferer) {
+      headers['HTTP-Referer'] = openRouterReferer;
+    }
+
+    if (openRouterTitle) {
+      headers['X-Title'] = openRouterTitle;
+    }
+
+    console.log(`[KB] Invoking OpenRouter (${contextLabel}) with model ${basePayload.model}.`);
+    const response = await fetch(openRouterApiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(basePayload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenRouter responded with status ${response.status}: ${errorText}`);
+    }
+
+    return response.json();
+  };
+
+  const callLocalEndpoint = async () => {
+    if (!llmEndpoint) {
+      throw new Error('Local LLM endpoint not configured.');
+    }
+
+    console.log(`[KB] Invoking local LLM (${contextLabel}) at ${llmEndpoint} with model ${basePayload.model}.`);
+    const response = await fetch(llmEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(basePayload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Local LLM responded with status ${response.status}: ${errorText}`);
+    }
+
+    return response.json();
+  };
+
+  if (openRouterApiKey) {
+    try {
+      const data = await callOpenRouter();
+      return { data, provider: 'openrouter', model: basePayload.model };
+    } catch (error) {
+      console.error(`[KB] OpenRouter request failed for ${contextLabel}:`, error.message);
+      if (!llmEndpoint) {
+        throw error;
+      }
+    }
+  }
+
+  if (!llmEndpoint) {
+    throw new Error('No LLM endpoint available. Configure OPENROUTER_API_KEY or LLM_ENDPOINT.');
+  }
+
+  const data = await callLocalEndpoint();
+  return { data, provider: 'local', model: basePayload.model };
 };
 
 const documents = loadDocuments();
@@ -337,8 +421,9 @@ const runDeviceSelection = async ({
       content: JSON.stringify(selectionPayload, null, 2),
     });
 
+    const resolvedModel = model || openRouterModel || llmDefaultModel;
     const requestBody = {
-      model: model || 'gemma 3b',
+      model: resolvedModel,
       messages: selectionMessages,
       temperature: 0.3,
       response_format: {
@@ -347,19 +432,7 @@ const runDeviceSelection = async ({
       },
     };
 
-  const response = await fetch(llmEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[KB] Device selection endpoint responded with status ${response.status}: ${errorText}`);
-      throw new Error(`Device selection LLM error ${response.status}`);
-    }
-
-    const data = await response.json();
+    const { data } = await invokeChatCompletion(requestBody, { contextLabel: 'device-selection' });
     const selectionMessage = data?.choices?.[0]?.message;
     if (!selectionMessage?.content) {
       throw new Error('Device selection LLM returned an empty response.');
@@ -564,7 +637,7 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
 
   while (true) {
     const requestPayload = {
-      model: uiSchema.model || 'gemma 3b',
+      model: uiSchema.model || openRouterModel || llmDefaultModel,
       messages,
       temperature: 0.7,
     };
@@ -581,21 +654,8 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
       };
     }
 
-  console.log('[KB] Invoking LLM endpoint', llmEndpoint, 'with model', requestPayload.model, 'schema enforced?', enforceSchema);
-
-  const llmResponse = await fetch(llmEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestPayload),
-    });
-
-    if (!llmResponse.ok) {
-      const errorText = await llmResponse.text();
-      console.error(`[KB] LLM endpoint responded with status ${llmResponse.status}: ${errorText}`);
-      throw new Error(`LLM endpoint error ${llmResponse.status}`);
-    }
-
-    const llmData = await llmResponse.json();
+    const { data: llmData, provider } = await invokeChatCompletion(requestPayload, { contextLabel: 'ui-generation' });
+    console.log(`[KB] LLM provider ${provider} returned data for ui-generation (schema enforced? ${enforceSchema}).`);
     console.log('LLM Data:', llmData);
 
     const responseMessage = llmData?.choices?.[0]?.message;
