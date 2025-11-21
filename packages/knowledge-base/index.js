@@ -24,6 +24,7 @@ const openRouterApiUrl = process.env.OPENROUTER_API_URL || 'https://openrouter.a
 const openRouterModel = process.env.OPENROUTER_MODEL || null;
 const openRouterReferer = process.env.OPENROUTER_APP_URL || process.env.OPENROUTER_REFERER || null;
 const openRouterTitle = process.env.OPENROUTER_APP_NAME || process.env.OPENROUTER_TITLE || 'IMP Requirements KB';
+const openRouterReasoningEffort = process.env.OPENROUTER_REASONING_EFFORT || null;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -152,6 +153,17 @@ const persistDocuments = (docs) => {
 const invokeChatCompletion = async (requestBody, { contextLabel = 'llm-request' } = {}) => {
   const effectiveModel = requestBody.model || openRouterModel || llmDefaultModel;
   const basePayload = { ...requestBody, model: effectiveModel };
+
+  if (openRouterReasoningEffort) {
+    const normalizedEffort = openRouterReasoningEffort.trim();
+    if (normalizedEffort.length > 0) {
+      const existingReasoning = typeof basePayload.reasoning === 'object' ? basePayload.reasoning : {};
+      basePayload.reasoning = {
+        ...existingReasoning,
+        effort: normalizedEffort,
+      };
+    }
+  }
 
   const callOpenRouter = async () => {
     if (!openRouterApiKey) {
