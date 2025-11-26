@@ -63,7 +63,6 @@
     "defaultPrimaryColor": "#1f6feb"
   },
   "context": {
-    "controlledThing": "light-switch",
     "modalityPreference": "visual-first"
   },
   "responseSchema": {
@@ -124,6 +123,10 @@
           "type": { "const": "container" },
           "title": { "type": "string" },
           "layout": { "type": "string" },
+          "thingId": {
+            "type": "string",
+            "description": "Optional thing identifier that all nested children primarily control."
+          },
           "children": {
             "type": "array",
             "minItems": 1,
@@ -139,7 +142,11 @@
           "type": { "const": "text" },
           "text": { "type": "string" },
           "variant": { "type": "string" },
-          "tone": { "type": "string" }
+          "tone": { "type": "string" },
+          "thingId": {
+            "type": "string",
+            "description": "Optional thing identifier this text references when showing state or instructions."
+          }
         },
         "required": ["type", "text"]
       },
@@ -151,6 +158,10 @@
           "label": { "type": "string" },
           "icon": { "type": "string" },
           "style": { "type": "string" },
+          "thingId": {
+            "type": "string",
+            "description": "Thing identifier to target when executing the bound action."
+          },
           "action": {
             "description": "Action payload or identifier to execute when the button is pressed.",
             "oneOf": [
@@ -168,6 +179,10 @@
           "type": { "const": "toggle" },
           "label": { "type": "string" },
           "checked": { "type": "boolean" },
+          "thingId": {
+            "type": "string",
+            "description": "Thing identifier to target when toggling."
+          },
           "action": {
             "oneOf": [
               { "type": "string" },
@@ -188,6 +203,10 @@
           "step": { "type": "number", "default": 1 },
           "value": { "type": "number" },
           "unit": { "type": "string" },
+          "thingId": {
+            "type": "string",
+            "description": "Thing identifier to target when sending slider updates."
+          },
           "action": {
             "oneOf": [
               { "type": "string" },
@@ -205,6 +224,10 @@
           "label": { "type": "string" },
           "placeholder": { "type": "string" },
           "value": { "type": "string" },
+          "thingId": {
+            "type": "string",
+            "description": "Thing identifier to target when selection changes."
+          },
           "options": {
             "type": "array",
             "items": {
@@ -235,6 +258,10 @@
           "value": { "type": "string" },
           "icon": { "type": "string" },
           "tone": { "type": "string" },
+          "thingId": {
+            "type": "string",
+            "description": "Thing identifier whose state this card summarizes."
+          },
           "items": {
             "type": "array",
             "items": {
@@ -256,7 +283,11 @@
         "properties": {
           "type": { "const": "toolCall" },
           "tool": { "type": "string" },
-          "parameters": { "type": "object", "additionalProperties": true }
+          "parameters": { "type": "object", "additionalProperties": true },
+          "thingId": {
+            "type": "string",
+            "description": "Thing identifier providing context for the tool output."
+          }
         },
         "required": ["type", "tool"]
       }

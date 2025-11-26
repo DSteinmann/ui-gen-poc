@@ -126,7 +126,19 @@ const voiceUiSchema = {
   context: {
     modalityPreference: 'audio-first',
     primaryInput: 'voice',
-    controlledThing: 'light-switch',
+    primaryThingId: 'thing-light-switch-001',
+    supportedThings: [
+      {
+        thingId: 'thing-light-switch-001',
+        label: 'Living Room Light Switch',
+        description: 'Mains-powered switch controlling the living room ceiling lighting circuit.',
+      },
+      {
+        thingId: 'thing-tractorbot-spock',
+        label: 'TractorBot Spock',
+        description: 'Autonomous field tractor with mobility controls and sensor telemetry endpoints.',
+      },
+    ],
   },
 };
 

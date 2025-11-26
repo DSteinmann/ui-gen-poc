@@ -320,6 +320,50 @@ const selectTargetDevice = ({ requestedDeviceId, desiredCapabilities = [] } = {}
   };
 };
 
+const collectThingActionsForDevice = (deviceRecord, resolvedThingDescription) => {
+  const orderedThingIds = [];
+  const explicitThingId = deviceRecord?.thingId || resolvedThingDescription?.id || null;
+
+  if (explicitThingId) {
+    orderedThingIds.push(explicitThingId);
+  }
+
+  thingRegistry.forEach((thing) => {
+    if (!orderedThingIds.includes(thing.id)) {
+      orderedThingIds.push(thing.id);
+    }
+  });
+
+  const aggregated = [];
+  orderedThingIds.forEach((thingId) => {
+    const registeredThing = thingRegistry.get(thingId);
+    if (!registeredThing && thingId !== explicitThingId) {
+      return;
+    }
+
+    const descriptionSource = thingId === explicitThingId
+      ? resolvedThingDescription || registeredThing?.description
+      : registeredThing?.description;
+
+    const metadataSource = thingId === explicitThingId
+      ? deviceRecord?.metadata || registeredThing?.metadata
+      : registeredThing?.metadata;
+
+    if (!descriptionSource) {
+      return;
+    }
+
+    const actions = ensureThingActions({
+      thingId,
+      thingDescription: descriptionSource,
+      metadata: metadataSource,
+    });
+    aggregated.push(...actions);
+  });
+
+  return aggregated;
+};
+
 const buildDynamicPrompt = ({
   basePrompt,
   targetDevice,
@@ -691,11 +735,14 @@ const generateUiForDevice = async ({
     }
   }
 
-  const normalizedThingActions = ensureThingActions({
-    thingId: targetDevice?.thingId || resolvedThingDescription?.id || null,
-    thingDescription: resolvedThingDescription,
-    metadata: targetDevice?.metadata,
-  });
+  const normalizedThingActions = collectThingActionsForDevice(targetDevice, resolvedThingDescription);
+
+  const availableThings = Array.from(thingRegistry.values()).map((thing) => ({
+    id: thing.id,
+    title: thing.description?.title || thing.metadata?.deviceType || thing.id,
+    description: thing.description,
+    metadata: thing.metadata,
+  }));
 
   const { capabilityData, missingCapabilities } = await collectCapabilityData(resolvedCapabilities, {
     prompt: resolvedPrompt,
@@ -747,6 +794,7 @@ const generateUiForDevice = async ({
       targetDeviceId,
     },
     thingActions: normalizedThingActions,
+    availableThings,
   };
 
   console.log(`[Core] Generating UI for device '${targetDeviceId}' with capabilities: ${resolvedCapabilities.join(', ') || 'none'} (reason: ${selectionMeta.reason})`);

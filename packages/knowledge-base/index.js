@@ -300,7 +300,7 @@ const seedKnowledgeBase = () => {
 
 seedKnowledgeBase();
 
-const retrieveRelevantDocuments = ({ prompt, thingDescription, capabilityData, capabilities, missingCapabilities, device, uiContext, thingActions }) => {
+const retrieveRelevantDocuments = ({ prompt, thingDescription, capabilityData, capabilities, missingCapabilities, device, uiContext, thingActions, availableThings }) => {
   if (!documents.length) return [];
 
   const querySegments = [];
@@ -328,6 +328,9 @@ const retrieveRelevantDocuments = ({ prompt, thingDescription, capabilityData, c
   }
   if (Array.isArray(thingActions) && thingActions.length > 0) {
     querySegments.push(JSON.stringify({ thingActions }));
+  }
+  if (Array.isArray(availableThings) && availableThings.length > 0) {
+    querySegments.push(JSON.stringify({ availableThings }));
   }
 
   const query = querySegments.filter(Boolean).join('\n');
@@ -485,7 +488,7 @@ const runDeviceSelection = async ({
     return parsed;
   };
 
-async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema = {}, capabilityData, missingCapabilities, device, deviceId, selection, thingActions = [] }) {
+async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema = {}, capabilityData, missingCapabilities, device, deviceId, selection, thingActions = [], availableThings = [] }) {
   const availableComponents = uiSchema.components || {};
   const availableComponentNames = Object.keys(availableComponents);
   const availableTools = uiSchema.tools || {};
@@ -509,11 +512,16 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
     device,
     uiContext: uiSchema.context,
     thingActions,
+    availableThings,
   });
 
   if (retrievedDocuments.length) {
     console.log('Retrieved documents for context:', retrievedDocuments.map((doc) => `${doc.id} (score ${doc.score.toFixed(3)})`));
   }
+
+  const allowedActionIds = Array.isArray(thingActions)
+    ? thingActions.map((action) => action && action.id).filter(Boolean)
+    : [];
 
   if (filteredSchema?.definitions) {
     for (const key in filteredSchema.definitions) {
@@ -631,13 +639,30 @@ ${actionSummaries}
 Reference the action id in generated components so downstream services can invoke them without hard-coding transport details. If you introduce a higher-level control, you must map it to either an existing action id or one of the documented intent aliases—do NOT invent new command names or payload shapes.`,
     });
 
-    const allowedActionIds = thingActions.map((action) => action.id).filter(Boolean);
-    if (allowedActionIds.length > 0) {
-      messages.push({
-        role: 'system',
-        content: `STRICT REQUIREMENT: Only the following action ids may appear in the generated UI: ${allowedActionIds.join(', ')}. Every button, toggle, slider, or interactive component must reference one of these ids (either by copying the full descriptor or by setting an object such as { "type": "thingAction", "id": "<allowed-id>" }). If no provided action satisfies a user need, omit the control entirely instead of inventing command names (e.g., never output "setPower").`,
-      });
-    }
+  } else if (Array.isArray(availableThings) && availableThings.length > 0) {
+    messages.push({
+      role: 'system',
+      content: 'Multiple Things are registered, but no executable actions were provided. Prefer read-only controls until action descriptors arrive.',
+    });
+  }
+
+  if (Array.isArray(availableThings) && availableThings.length > 0) {
+    const availableThingSummary = availableThings.map((thing) => {
+      const label = thing.title || thing.metadata?.deviceType || thing.id;
+      return `- ${label} (id: ${thing.id})`;
+    }).join('\n');
+
+    messages.push({
+      role: 'system',
+      content: `Available Things detected:\n${availableThingSummary}\nYou may create separate sections/components for different thingIds. Always include the corresponding thingId on each control so the downstream device knows which Thing to target.`,
+    });
+  }
+
+  if (allowedActionIds.length > 0) {
+    messages.push({
+      role: 'system',
+      content: `STRICT REQUIREMENT: Only the following action ids may appear in the generated UI: ${allowedActionIds.join(', ')}. Every button, toggle, slider, or interactive component must reference one of these ids (either by copying the full descriptor or by setting an object such as { "type": "thingAction", "id": "<allowed-id>" }). If no provided action satisfies a user need, omit the control entirely instead of inventing command names (e.g., never output "setPower").`,
+    });
   } else {
     messages.push({
       role: 'system',
@@ -661,6 +686,7 @@ Reference the action id in generated components so downstream services can invok
     missingCapabilities,
     selection,
     thingActions,
+    availableThings,
   };
 
   messages.push({
@@ -947,7 +973,7 @@ app.post('/select-device', async (req, res) => {
 });
 
 app.post('/query', async (req, res) => {
-  const { prompt, thingDescription, capabilities, schema, capabilityData, missingCapabilities, device, deviceId, selection, thingActions } = req.body;
+  const { prompt, thingDescription, capabilities, schema, capabilityData, missingCapabilities, device, deviceId, selection, thingActions, availableThings } = req.body;
   console.log('[KB] /query invoked', {
     promptPreview: typeof prompt === 'string' ? `${prompt.slice(0, 60)}${prompt.length > 60 ? '…' : ''}` : null,
     capabilities,
@@ -966,6 +992,7 @@ app.post('/query', async (req, res) => {
   deviceId,
       selection,
       thingActions,
+      availableThings,
     });
 
     if (!generatedUi || Object.keys(generatedUi).length === 0) {
