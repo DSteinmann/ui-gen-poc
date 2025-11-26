@@ -1,3 +1,4 @@
+// Core orchestrates registration, capability discovery, and LLM-backed UI generation for every device.
 import express from 'express';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -44,6 +45,7 @@ let cachedGeneralDefaultPrompt;
 const defaultResponseSchemaPath = path.resolve(__dirname, 'output.schema.json');
 const defaultResponseSchema = JSON.parse(readFileSync(defaultResponseSchemaPath, 'utf-8'));
 
+// Very small service registry so other containers can discover capabilities, generic services, and devices.
 const serviceRegistryByType = {
   generic: new Map(),
   capability: new Map(),
@@ -90,6 +92,7 @@ const resolveCapabilityRecord = (capabilityName) => {
   return serviceRegistryByType.capability.get(moduleName) || null;
 };
 
+// Convert the capability registry into prose the LLM can reason about when deciding to call tools.
 const summarizeCapabilitiesForPrompt = (capabilityNames = []) => {
   const uniqueCapabilities = Array.from(new Set(capabilityNames.filter(Boolean)));
   if (uniqueCapabilities.length === 0) {
@@ -168,6 +171,7 @@ const resolveEndpointConfig = (moduleRecord) => {
   };
 };
 
+// Call each capability module once per UI generation so the UI prompt includes fresh telemetry samples.
 const collectCapabilityData = async (requestedCapabilities = [], context = {}) => {
   const capabilityData = {};
   const missingCapabilities = [];
@@ -274,6 +278,7 @@ const scoreDeviceForCapabilities = (device, desiredCapabilities = []) => {
   };
 };
 
+// Heuristic fallback when the KB can't decide which physical device should render the UI.
 const selectTargetDevice = ({ requestedDeviceId, desiredCapabilities = [] } = {}) => {
   if (requestedDeviceId) {
     const explicitDevice = deviceRegistry.get(requestedDeviceId);
@@ -320,6 +325,7 @@ const selectTargetDevice = ({ requestedDeviceId, desiredCapabilities = [] } = {}
   };
 };
 
+// Gather executable descriptors. Prioritize the device's bound Thing (if any) but still surface every registered Thing.
 const collectThingActionsForDevice = (deviceRecord, resolvedThingDescription) => {
   const orderedThingIds = [];
   const explicitThingId = deviceRecord?.thingId || resolvedThingDescription?.id || null;
@@ -415,6 +421,7 @@ ${capabilitySummary}`
     .join('\n\n');
 };
 
+// Ask the KB/LLM to choose a device when multiple are connected; it sees component lists, capabilities, and prompts.
 const selectDeviceViaKnowledgeBase = async ({
   prompt,
   thingDescription,
@@ -524,6 +531,7 @@ const ensureSocketSet = (deviceId) => {
   return deviceSockets.get(deviceId);
 };
 
+// Cache the latest UI per device and fan out over websockets; late joiners receive the cached definition immediately.
 const dispatchUiToClients = (deviceId, uiDefinition) => {
   if (deviceId) {
     latestUiByDevice.set(deviceId, uiDefinition);
@@ -557,6 +565,7 @@ const dispatchUiToClients = (deviceId, uiDefinition) => {
   });
 };
 
+// Main orchestrator: pick a device, gather actions/capabilities, call the KB, then ship the rendered UI back out.
 const generateUiForDevice = async ({
   deviceId,
   prompt,
@@ -775,6 +784,7 @@ const generateUiForDevice = async ({
     }
   });
 
+  // Everything the KB needs to ground the LLM: schema subset, resolved TD, capability telemetry, and action catalog.
   const knowledgeBasePayload = {
     prompt: resolvedPrompt,
     schema: resolvedSchema,
@@ -843,6 +853,7 @@ const generateUiForDevice = async ({
   return generatedUi;
 };
 
+// Periodically regenerate UIs so devices pick up new core instructions or Thing changes even without manual refresh.
 const scheduleDeviceUiRefresh = () => {
   setInterval(() => {
     deviceRegistry.forEach((record) => {
@@ -853,6 +864,7 @@ const scheduleDeviceUiRefresh = () => {
   }, uiRefreshIntervalMs);
 };
 
+// Whenever a Thing registers or updates, reflow the UI for any device that's pinned to it.
 const refreshDevicesAssociatedWithThing = (thingId) => {
   if (!thingId) {
     return;
@@ -882,6 +894,7 @@ const getRegistryForType = (type = 'generic') => {
   return serviceRegistryByType.generic;
 };
 
+// Lightweight registry endpoint so dependencies can find each other without docker-compose service names.
 const registerService = ({
   name,
   url,
@@ -1189,6 +1202,7 @@ app.post('/refresh', async (req, res) => {
 });
 
 wss.on('connection', (ws, request) => {
+  // Devices connect over websocket to receive UI pushes; we tag each connection with a deviceId when provided.
   let deviceId;
 
   try {

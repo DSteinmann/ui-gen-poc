@@ -1,3 +1,4 @@
+// Knowledge base orchestrates requirement retrieval plus guarded LLM calls for UI generation and device selection.
 import express from 'express';
 import cors from 'cors';
 import fetch from 'node-fetch';
@@ -105,6 +106,7 @@ const registerWithServiceRegistry = async () => {
   }
 };
 
+// Minimal text preprocessing for TF/IDF scoring.
 const tokenize = (text = '') =>
   text
     .toLowerCase()
@@ -150,6 +152,7 @@ const persistDocuments = (docs) => {
   fs.writeFileSync(DATA_FILE, JSON.stringify({ documents: docs }, null, 2), 'utf-8');
 };
 
+// Unified entry point for both OpenRouter and a local LLM endpoint; falls back automatically if one fails.
 const invokeChatCompletion = async (requestBody, { contextLabel = 'llm-request' } = {}) => {
   const effectiveModel = requestBody.model || openRouterModel || llmDefaultModel;
   const basePayload = { ...requestBody, model: effectiveModel };
@@ -241,6 +244,7 @@ const invokeChatCompletion = async (requestBody, { contextLabel = 'llm-request' 
 const documents = loadDocuments();
 let lastDeviceSelection = null;
 
+// Plausibly we'd persist to a DB, but for now documents stay in-memory + JSON for simplicity.
 const addDocument = ({ id, content, metadata = {}, tags = [] }) => {
   if (!content || typeof content !== 'string') {
     throw new Error('Document `content` must be a non-empty string.');
@@ -300,6 +304,7 @@ const seedKnowledgeBase = () => {
 
 seedKnowledgeBase();
 
+// Quick-n-dirty TF/IDF scorer that pulls requirement snippets relevant to the current prompt/context bundle.
 const retrieveRelevantDocuments = ({ prompt, thingDescription, capabilityData, capabilities, missingCapabilities, device, uiContext, thingActions, availableThings }) => {
   if (!documents.length) return [];
 
@@ -357,6 +362,7 @@ const retrieveRelevantDocuments = ({ prompt, thingDescription, capabilityData, c
   return scoredDocuments;
 };
 
+// Let the LLM pick which registered device should render the UI by weighing schema components and capabilities.
 const runDeviceSelection = async ({
     prompt,
     fallbackPrompt,
@@ -488,6 +494,7 @@ const runDeviceSelection = async ({
     return parsed;
   };
 
+// Orchestrates the UI LLM call: filters schema, builds guardrail messages, optionally attaches function-calling tools.
 async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema = {}, capabilityData, missingCapabilities, device, deviceId, selection, thingActions = [], availableThings = [] }) {
   const availableComponents = uiSchema.components || {};
   const availableComponentNames = Object.keys(availableComponents);
@@ -568,6 +575,7 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
     .map((doc, index) => `Document ${index + 1} (score: ${doc.score.toFixed(3)}):\nSource: ${doc.metadata?.source || 'unspecified'}\nTags: ${(doc.tags || []).join(', ') || 'none'}\n${doc.content}`)
     .join('\n\n');
 
+  // System prompts: describe available components plus any requirement snippets found by TF/IDF scoring.
   const messages = [
     {
       role: 'system',
@@ -694,6 +702,7 @@ Reference the action id in generated components so downstream services can invok
     content: JSON.stringify(userContext, null, 2),
   });
 
+  // Tools may specify relative paths; normalize once so the UI schema can forward absolute URLs to the device.
   const composeToolUrl = (base, path = '') => {
     if (!path || path === '/') {
       return base;
@@ -701,6 +710,7 @@ Reference the action id in generated components so downstream services can invok
     return `${base}${path.startsWith('/') ? path : `/${path}`}`;
   };
 
+  // LLM responses are JSON strings when schema-enforced; parse and guard to avoid crashing the loop.
   const parseAssistantContent = (content) => {
     if (!content || typeof content !== 'string') {
       return null;
@@ -946,6 +956,7 @@ app.get('/debug/last-device-selection', (req, res) => {
   res.json(lastDeviceSelection);
 });
 
+// Core posts here when it wants the KB/LLM to choose the best rendering device.
 app.post('/select-device', async (req, res) => {
   const {
     prompt,
@@ -972,6 +983,7 @@ app.post('/select-device', async (req, res) => {
   }
 });
 
+// Main UI-generation entrypoint: core submits schema/actions, KB returns the LLM-crafted UI JSON.
 app.post('/query', async (req, res) => {
   const { prompt, thingDescription, capabilities, schema, capabilityData, missingCapabilities, device, deviceId, selection, thingActions, availableThings } = req.body;
   console.log('[KB] /query invoked', {

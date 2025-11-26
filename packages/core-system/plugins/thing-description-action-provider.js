@@ -8,6 +8,7 @@ const arrayify = (value) => {
   return [value];
 };
 
+// Thing Descriptions can set either `base` or `baseUrl`; normalize once so we can resolve relative forms later.
 const resolveBaseUrl = (thingDescription = {}) => {
   if (typeof thingDescription.base === 'string' && thingDescription.base.length > 0) {
     return thingDescription.base.endsWith('/') ? thingDescription.base.slice(0, -1) : thingDescription.base;
@@ -48,6 +49,7 @@ const inferMethodFromOps = (ops = []) => {
   return null;
 };
 
+// Convert WoT form entries into the subset our action registry consumes (absolute URLs, verb, metadata snapshot).
 const normalizeForms = ({ forms = [], baseUrl, defaultMethod = 'POST', defaultContentType = 'application/json' }) => {
   return arrayify(forms)
     .filter(Boolean)
@@ -68,6 +70,7 @@ const normalizeForms = ({ forms = [], baseUrl, defaultMethod = 'POST', defaultCo
     });
 };
 
+// Build a single action descriptor the rest of the core understands from the WoT action definition.
 const buildActionDescriptor = (thingContext, actionName, definition = {}) => {
   const baseUrl = resolveBaseUrl(thingContext.thingDescription);
   const actionTitle = definition.title || actionName;

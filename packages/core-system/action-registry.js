@@ -54,6 +54,7 @@ const cloneForms = (forms = []) => {
     }));
 };
 
+// Providers emit heterogeneous descriptors; normalize them so downstream consumers can treat everything uniformly.
 const normalizeDescriptor = (
   descriptor = {},
   context = {},
@@ -107,6 +108,7 @@ const normalizeDescriptor = (
   return normalized;
 };
 
+// Persist the latest descriptors for a thing and keep the reverse lookup map in sync.
 const saveActionsForThing = (thingId, actions = []) => {
   if (!thingId) {
     return;
@@ -168,6 +170,7 @@ const discoverActions = (context = {}, options = {}) => {
   return aggregated;
 };
 
+// Idempotently fetch and cache actions for a given Thing so repeated UI generations remain cheap.
 export const ensureThingActions = (context = {}) => {
   const thingId = context.thingId || context.thingDescription?.id || context.fallbackThingId || null;
   if (thingId && actionsByThingId.has(thingId)) {
@@ -181,6 +184,7 @@ export const ensureThingActions = (context = {}) => {
   return actions;
 };
 
+// Force refresh helpers bypass the cache when a Thing description changes at runtime.
 export const refreshThingActions = (context = {}) => {
   const thingId = context.thingId || context.thingDescription?.id || context.fallbackThingId || null;
   const actions = discoverActions(context, { fallbackThingId: thingId });

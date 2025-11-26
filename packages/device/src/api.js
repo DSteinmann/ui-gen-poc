@@ -569,6 +569,7 @@ const enrichActionForHttp = (action = {}, context = {}) => {
 
 const nowIsoString = () => new Date().toISOString();
 
+// Advertise this device to the simple service registry so other services can discover the HTTP entrypoint.
 const registerWithServiceRegistry = async () => {
   try {
     await fetch(`${serviceRegistryUrl}/register`, {
@@ -590,6 +591,7 @@ const registerWithServiceRegistry = async () => {
   }
 };
 
+// Tell the core which UI components we can render so it can filter the schema before prompting the LLM.
 const registerWithCoreSystem = async () => {
   const supportedComponents = Object.keys(uiSchema.components || {});
   const supportsTheming = uiSchema.theming?.supportsPrimaryColor ? ['theme.primaryColor'] : [];
@@ -623,6 +625,7 @@ const registerWithCoreSystem = async () => {
   }
 };
 
+// Device-level tools are just intent aliases; resolve them to concrete actions and fan out per matching Thing.
 const invokeDeviceTool = async (toolName, parameters = {}, context = {}) => {
   const { intent, matches } = await resolveIntentActions(toolName, context);
 
@@ -652,6 +655,7 @@ const invokeDeviceTool = async (toolName, parameters = {}, context = {}) => {
   };
 };
 
+// Try to rebuild an absolute URL for an action using whatever hints we have (forms, href, device defaults, env vars).
 const resolveActionUrl = async (action = {}, context = {}) => {
   if (!action) {
     return null;
