@@ -1,16 +1,5 @@
 {
   "name": "smartphone-light-switch-ui",
-  "tools": {
-    "getAmbientLight": {
-      "description": "Gets the current ambient light level from the device's sensor.",
-      "returns": "string",
-      "parameters": {
-        "type": "object",
-        "properties": {},
-        "additionalProperties": false
-      }
-    }
-  },
   "components": {
     "text": {
       "props": {
