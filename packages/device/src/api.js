@@ -7,10 +7,12 @@ import { fileURLToPath } from 'url';
 const app = express();
 const port = Number.parseInt(process.env.DEVICE_API_PORT || '3002', 10);
 const listenAddress = process.env.BIND_ADDRESS || '0.0.0.0';
-const serviceRegistryUrl = process.env.SERVICE_REGISTRY_URL || 'http://localhost:3000';
-const coreSystemUrl = process.env.CORE_SYSTEM_URL || 'http://localhost:3001';
-const devicePublicUrl = process.env.DEVICE_API_PUBLIC_URL || `http://localhost:${port}`;
-const defaultThingBaseUrl = process.env.THING_BASE_URL || 'http://localhost:3006/light-switch';
+const serviceRegistryUrl = process.env.SERVICE_REGISTRY_URL || 'http://core-system:3000';
+const coreSystemUrl = process.env.CORE_SYSTEM_URL || 'http://core-system:3001';
+const devicePublicUrl = process.env.DEVICE_API_PUBLIC_URL || `http://device-api:${port}`;
+const defaultThingBaseUrl = process.env.THING_BASE_URL || null;
+const primaryThingId = process.env.DEVICE_PRIMARY_THING_ID || null;
+const ACTION_CACHE_TTL_MS = Number.parseInt(process.env.ACTION_CACHE_TTL_MS || '60000', 10);
 
 app.use(express.json());
 
@@ -35,6 +37,166 @@ app.use((req, res, next) => {
 });
 
 const deviceId = 'device-smartphone-001';
+const actionCacheByThing = new Map();
+const actionCacheById = new Map();
+const arrayify = (value) => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (value === undefined || value === null || value === '') {
+    return [];
+  }
+  return [value];
+};
+
+const canonicalizeIntentName = (value) => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const normalized = value.toString().trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  return normalized;
+};
+
+const getActionIntentAliases = (action) => (
+  arrayify(action?.metadata?.intentAliases)
+    .map((alias) => canonicalizeIntentName(alias))
+    .filter(Boolean)
+);
+
+const actionHasIntentAlias = (action, canonicalIntentName) => (
+  getActionIntentAliases(action).includes(canonicalIntentName)
+);
+
+const collectActionNameCandidates = (action = {}) => {
+  const candidates = [action.id, action.name, action.title, action.actionId, action.actionName];
+  return candidates
+    .map((value) => canonicalizeIntentName(value))
+    .filter(Boolean);
+};
+
+const actionMatchesIntent = (action, canonicalIntentName) => {
+  if (!action || !canonicalIntentName) {
+    return false;
+  }
+
+  if (actionHasIntentAlias(action, canonicalIntentName)) {
+    return true;
+  }
+
+  const normalizedCandidates = collectActionNameCandidates(action);
+  return normalizedCandidates.includes(canonicalIntentName);
+};
+
+
+
+const determineCandidateThingIds = (context = {}) => {
+  const ids = new Set();
+  const possible = [
+    context.thingId,
+    context.thing?.id,
+    context.thing?.thingId,
+    context.targetThingId,
+    primaryThingId,
+  ];
+
+  possible.forEach((id) => {
+    if (typeof id === 'string' && id.trim()) {
+      ids.add(id.trim());
+    }
+  });
+
+  actionCacheByThing.forEach((_value, key) => {
+    if (key) {
+      ids.add(key);
+    }
+  });
+
+  return Array.from(ids);
+};
+
+const loadThingActionsForIntent = async (context = {}) => {
+  const thingIds = determineCandidateThingIds(context);
+  const entries = await Promise.all(
+    thingIds.map(async (thingId) => ({
+      thingId,
+      actions: await getThingActions(thingId),
+    }))
+  );
+
+  return entries.filter((entry) => Array.isArray(entry.actions) && entry.actions.length > 0);
+};
+
+const resolveIntentActions = async (intentName, context = {}) => {
+  const canonicalIntent = canonicalizeIntentName(intentName);
+  if (!canonicalIntent) {
+    return { intent: null, matches: [] };
+  }
+
+  const thingEntries = await loadThingActionsForIntent(context);
+  const matches = [];
+
+  thingEntries.forEach(({ thingId, actions }) => {
+    actions.forEach((action) => {
+      if (actionMatchesIntent(action, canonicalIntent)) {
+        matches.push({ thingId, action });
+      }
+    });
+  });
+
+  return { intent: canonicalIntent, matches };
+};
+
+const normalizeActionKey = (value) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const collectCandidateActionKeys = (actionPayload = {}) => {
+  const rawCandidates = [
+    actionPayload.id,
+    actionPayload.actionId,
+    actionPayload.name,
+    actionPayload.actionName,
+    actionPayload.command,
+    actionPayload.intent,
+    actionPayload.action,
+    actionPayload.title,
+  ];
+
+  const deduped = [];
+  rawCandidates.forEach((candidate) => {
+    const normalized = normalizeActionKey(candidate);
+    if (!normalized) {
+      return;
+    }
+    if (!deduped.includes(normalized)) {
+      deduped.push(normalized);
+    }
+  });
+
+  return deduped;
+};
+
+const matchDescriptorByCandidates = (actions = [], candidates = []) => {
+  if (!Array.isArray(actions) || actions.length === 0 || candidates.length === 0) {
+    return null;
+  }
+
+  const loweredCandidates = candidates.map((candidate) => candidate.toLowerCase());
+
+  return actions.find((descriptor) => {
+    const comparisonFields = [descriptor.id, descriptor.name, descriptor.title]
+      .filter((field) => typeof field === 'string')
+      .map((field) => field.toLowerCase());
+    return loweredCandidates.some((candidate) => comparisonFields.includes(candidate));
+  }) || null;
+};
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,6 +220,220 @@ const composeUrl = (base, providedPath = '/') => {
   }
 
   return `${base}${providedPath}`;
+};
+
+const hasExecutableHints = (candidate) => {
+  if (!candidate || typeof candidate !== 'object') {
+    return false;
+  }
+  if (candidate.url || candidate.href || candidate.path || candidate.service) {
+    return true;
+  }
+  if ((candidate.baseUrl && candidate.method) || candidate.transport) {
+    return true;
+  }
+  if (Array.isArray(candidate.forms) && candidate.forms.length > 0) {
+    return true;
+  }
+  return false;
+};
+
+const deriveThingIdFromActionId = (actionId = '') => {
+  if (typeof actionId !== 'string') {
+    return null;
+  }
+  const delimiterIndex = actionId.indexOf('::');
+  if (delimiterIndex === -1) {
+    return null;
+  }
+  return actionId.slice(0, delimiterIndex) || null;
+};
+
+const rememberThingActions = (thingId, actions = []) => {
+  if (!thingId) {
+    return [];
+  }
+  const normalized = Array.isArray(actions) ? actions : [];
+  actionCacheByThing.set(thingId, { actions: normalized, fetchedAt: Date.now() });
+  normalized.forEach((descriptor) => {
+    if (descriptor?.id) {
+      actionCacheById.set(descriptor.id, descriptor);
+    }
+  });
+  return normalized;
+};
+
+const getCachedThingActions = (thingId) => {
+  if (!thingId) {
+    return null;
+  }
+  const cached = actionCacheByThing.get(thingId);
+  if (!cached) {
+    return null;
+  }
+  if (Date.now() - cached.fetchedAt > ACTION_CACHE_TTL_MS) {
+    actionCacheByThing.delete(thingId);
+    return null;
+  }
+  return cached.actions;
+};
+
+const fetchThingActionsFromCore = async (thingId) => {
+  if (!thingId) {
+    return [];
+  }
+
+  try {
+    const response = await fetch(`${coreSystemUrl}/things/${encodeURIComponent(thingId)}/actions`);
+    if (!response.ok) {
+      if (response.status !== 404) {
+        console.warn(`[Device] Failed to fetch actions for thing '${thingId}': ${response.status}`);
+      }
+      return [];
+    }
+
+    const payload = await response.json();
+    const actions = Array.isArray(payload?.actions) ? payload.actions : [];
+    return rememberThingActions(thingId, actions);
+  } catch (error) {
+    console.error(`[Device] Error fetching actions for thing '${thingId}':`, error.message);
+    return [];
+  }
+};
+
+const getThingActions = async (thingId) => {
+  const cached = getCachedThingActions(thingId);
+  if (cached) {
+    return cached;
+  }
+  return fetchThingActionsFromCore(thingId);
+};
+
+const fetchActionByIdFromCore = async (actionId) => {
+  if (!actionId) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${coreSystemUrl}/actions/${encodeURIComponent(actionId)}`);
+    if (!response.ok) {
+      return null;
+    }
+    const payload = await response.json();
+    const descriptor = payload?.action || null;
+    if (descriptor?.thingId) {
+      const existing = getCachedThingActions(descriptor.thingId) || [];
+      const nextEntries = existing.some((entry) => entry.id === descriptor.id)
+        ? existing.map((entry) => (entry.id === descriptor.id ? descriptor : entry))
+        : [...existing, descriptor];
+      rememberThingActions(descriptor.thingId, nextEntries);
+    } else if (descriptor?.id) {
+      actionCacheById.set(descriptor.id, descriptor);
+    }
+    return descriptor;
+  } catch (error) {
+    console.error(`[Device] Error fetching action '${actionId}' from core:`, error.message);
+    return null;
+  }
+};
+
+const mergeActionDescriptors = (baseDescriptor = {}, overrideDescriptor = {}) => {
+  const merged = {
+    ...baseDescriptor,
+    ...overrideDescriptor,
+  };
+
+  merged.transport = {
+    ...(baseDescriptor.transport || {}),
+    ...(overrideDescriptor.transport || {}),
+  };
+
+  merged.headers = {
+    ...(baseDescriptor.headers || {}),
+    ...(overrideDescriptor.headers || {}),
+  };
+
+  const overrideForms = Array.isArray(overrideDescriptor.forms) && overrideDescriptor.forms.length > 0
+    ? overrideDescriptor.forms
+    : null;
+  merged.forms = overrideForms || baseDescriptor.forms || [];
+
+  if (!merged.url && merged.transport?.url) {
+    merged.url = merged.transport.url;
+  }
+  if (!merged.href && merged.transport?.href) {
+    merged.href = merged.transport.href;
+  }
+  if (!merged.path && merged.transport?.path) {
+    merged.path = merged.transport.path;
+  }
+  if (!merged.method && merged.transport?.method) {
+    merged.method = merged.transport.method;
+  }
+  if (!merged.baseUrl && merged.transport?.baseUrl) {
+    merged.baseUrl = merged.transport.baseUrl;
+  }
+
+  return merged;
+};
+
+const resolveActionDescriptor = async (actionPayload, context = {}) => {
+  if (!actionPayload || typeof actionPayload !== 'object') {
+    return actionPayload;
+  }
+
+  if (hasExecutableHints(actionPayload)) {
+    return actionPayload;
+  }
+
+  const candidateKeys = collectCandidateActionKeys(actionPayload);
+  const derivedThingId = candidateKeys
+    .map((candidate) => deriveThingIdFromActionId(candidate))
+    .find(Boolean)
+    || null;
+  const resolvedThingId = actionPayload.thingId
+    || context.thingId
+    || context.thing?.id
+    || context.thing?.thingId
+    || derivedThingId
+    || primaryThingId;
+
+  let descriptor = null;
+
+  for (const candidate of candidateKeys) {
+    if (!candidate) {
+      continue;
+    }
+    const cachedDescriptor = actionCacheById.get(candidate);
+    if (cachedDescriptor) {
+      descriptor = cachedDescriptor;
+      break;
+    }
+  }
+
+  if (!descriptor && resolvedThingId) {
+    const actions = await getThingActions(resolvedThingId);
+    descriptor = matchDescriptorByCandidates(actions, candidateKeys);
+  }
+
+  if (!descriptor) {
+    for (const candidate of candidateKeys) {
+      if (!candidate || !candidate.includes('::')) {
+        continue;
+      }
+      const fetched = await fetchActionByIdFromCore(candidate);
+      if (fetched) {
+        descriptor = fetched;
+        break;
+      }
+    }
+  }
+
+  if (!descriptor) {
+    return actionPayload;
+  }
+
+  return mergeActionDescriptors(descriptor, actionPayload);
 };
 
 const inferMethodFromOp = (opValue) => {
@@ -109,6 +485,7 @@ const resolveCandidateBaseUrl = (action = {}, context = {}) => {
   const inferred =
     action.baseUrl
     || action.base
+    || action.transport?.baseUrl
     || context?.thingBase
     || context?.thing?.description?.base;
 
@@ -131,6 +508,27 @@ const enrichActionForHttp = (action = {}, context = {}) => {
   }
 
   const expanded = { ...action };
+  if (action.transport && typeof action.transport === 'object') {
+    const transport = action.transport;
+    if (!expanded.url && transport.url) {
+      expanded.url = transport.url;
+    }
+    if (!expanded.href && (transport.href || transport.path)) {
+      expanded.href = transport.href || transport.path;
+    }
+    if (!expanded.method && transport.method) {
+      expanded.method = transport.method;
+    }
+    if (!expanded.baseUrl && transport.baseUrl) {
+      expanded.baseUrl = transport.baseUrl;
+    }
+    if (transport.headers) {
+      expanded.headers = {
+        ...(transport.headers || {}),
+        ...(expanded.headers || {}),
+      };
+    }
+  }
   const selectedForm = selectPreferredForm(action);
 
   if (selectedForm) {
@@ -200,7 +598,7 @@ const registerWithCoreSystem = async () => {
     id: deviceId,
     name: 'Smartphone Controller',
     url: devicePublicUrl,
-    thingId: 'thing-light-switch-001',
+    ...(primaryThingId ? { thingId: primaryThingId } : {}),
     capabilities: [],
     metadata: {
       deviceType: 'smartphone',
@@ -225,8 +623,33 @@ const registerWithCoreSystem = async () => {
   }
 };
 
-const invokeDeviceTool = async (toolName) => {
-  throw new Error(`Tool '${toolName || 'unknown'}' is not supported on this device.`);
+const invokeDeviceTool = async (toolName, parameters = {}, context = {}) => {
+  const { intent, matches } = await resolveIntentActions(toolName, context);
+
+  if (!intent) {
+    throw new Error(`Tool '${toolName || 'unknown'}' is not supported on this device.`);
+  }
+
+  if (matches.length === 0) {
+    throw new Error(`Intent '${intent}' is not available for the current thing context.`);
+  }
+
+  const responses = [];
+  for (const match of matches) {
+    const targetContext = { ...context, thingId: match.thingId };
+    const result = await dispatchHttpAction(match.action, targetContext);
+    responses.push({
+      thingId: match.thingId,
+      actionId: match.action.id,
+      response: result,
+    });
+  }
+
+  return {
+    intent,
+    parameters,
+    invoked: responses,
+  };
 };
 
 const resolveActionUrl = async (action = {}, context = {}) => {
@@ -322,40 +745,70 @@ const dispatchHttpAction = async (action, context = {}) => {
   };
 };
 
-const performExecutableAction = async (action, context = {}) => {
-  if (!action) {
+const performExecutableAction = async (actionPayload, context = {}) => {
+  if (actionPayload === undefined || actionPayload === null) {
     throw new Error('Missing action payload.');
   }
 
-  if (typeof action === 'string') {
-    console.log(`[Device] Executing simple command: ${action}`);
+  const originalWasString = typeof actionPayload === 'string';
+  const initialEnvelope = originalWasString ? { id: actionPayload } : { ...actionPayload };
+  const resolvedAction = await resolveActionDescriptor(initialEnvelope, context);
+  const resolvedContext = {
+    ...context,
+    thingId:
+      context.thingId
+      || resolvedAction.thingId
+      || deriveThingIdFromActionId(resolvedAction.id)
+      || primaryThingId,
+  };
+
+  if (originalWasString && !hasExecutableHints(resolvedAction)) {
+    console.log(`[Device] Executing simple command: ${actionPayload}`);
     return {
       kind: 'command',
-      command: action,
+      command: actionPayload,
       acknowledgedAt: nowIsoString(),
     };
   }
 
-  const normalizedType = typeof action.type === 'string' ? action.type.toLowerCase() : null;
-  const toolName = action.tool || action.toolName || action.command;
+  const normalizedType = typeof resolvedAction.type === 'string' ? resolvedAction.type.toLowerCase() : null;
+  const toolName = resolvedAction.tool
+    || resolvedAction.toolName
+    || resolvedAction.command
+    || resolvedAction.intent
+    || resolvedAction.intentName;
 
-  if (normalizedType === 'tool' || normalizedType === 'tool-call' || toolName) {
-    const result = await invokeDeviceTool(toolName, action.parameters || action.args || action.payload || {});
+  const isToolInvocation = (
+    normalizedType === 'tool'
+    || normalizedType === 'tool-call'
+    || normalizedType === 'toolcall'
+    || normalizedType === 'intent'
+    || Boolean(toolName)
+  );
+
+  if (isToolInvocation) {
+    const result = await invokeDeviceTool(
+      toolName,
+      resolvedAction.parameters || resolvedAction.args || resolvedAction.payload || {},
+      resolvedContext,
+    );
     return { kind: 'tool', tool: toolName, result };
   }
 
-  if (
+  const hasHttpDescriptor =
     normalizedType === 'http'
-    || action.url
-    || action.service
-    || action.baseUrl
-    || action.href
-    || (Array.isArray(action.forms) && action.forms.length > 0)
-  ) {
-    const result = await dispatchHttpAction(action, context);
+    || hasExecutableHints(resolvedAction);
+
+  if (hasHttpDescriptor) {
+    const result = await dispatchHttpAction(resolvedAction, resolvedContext);
     return { kind: 'http', response: result };
   }
 
+  console.warn('[Device] No executable properties found on action payload:', {
+    action: resolvedAction,
+    originalPayload: actionPayload,
+    context: resolvedContext,
+  });
   return { kind: 'noop', note: 'No executable properties found on action payload.' };
 };
 
@@ -379,7 +832,11 @@ const describeActionResult = (result) => {
 
 app.post('/api/call-tool', async (req, res) => {
   try {
-    const result = await invokeDeviceTool(req.body?.toolName, req.body?.parameters || req.body?.args || {});
+    const result = await invokeDeviceTool(
+      req.body?.toolName,
+      req.body?.parameters || req.body?.args || {},
+      req.body?.context || {},
+    );
     res.json(result);
   } catch (error) {
     console.error('Tool invocation failed:', error.message);

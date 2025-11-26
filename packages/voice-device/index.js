@@ -6,10 +6,10 @@ import { fileURLToPath } from 'url';
 const app = express();
 const port = Number.parseInt(process.env.VOICE_DEVICE_PORT || '3004', 10);
 const listenAddress = process.env.BIND_ADDRESS || '0.0.0.0';
-const serviceRegistryUrl = process.env.SERVICE_REGISTRY_URL || 'http://localhost:3000';
-const coreSystemUrl = process.env.CORE_SYSTEM_URL || 'http://localhost:3001';
-const devicePublicUrl = process.env.VOICE_DEVICE_PUBLIC_URL || `http://localhost:${port}`;
-const thingsBaseUrl = process.env.LIGHT_SWITCH_BASE_URL || 'http://localhost:3006/light-switch';
+const serviceRegistryUrl = process.env.SERVICE_REGISTRY_URL || 'http://core-system:3000';
+const coreSystemUrl = process.env.CORE_SYSTEM_URL || 'http://core-system:3001';
+const devicePublicUrl = process.env.VOICE_DEVICE_PUBLIC_URL || `http://voice-device:${port}`;
+const thingsBaseUrl = process.env.LIGHT_SWITCH_BASE_URL || 'http://things:3006/light-switch';
 const recognitionLanguage = process.env.VOICE_DEVICE_LANG || 'en-US';
 
 const deriveCoreWebsocketUrl = () => {
@@ -22,8 +22,8 @@ const deriveCoreWebsocketUrl = () => {
     parsed.protocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
     return parsed.toString();
   } catch (error) {
-    console.warn('[Voice Device] Failed to derive core websocket URL from CORE_SYSTEM_URL, defaulting to ws://localhost:3001');
-    return 'ws://localhost:3001';
+    console.warn('[Voice Device] Failed to derive core websocket URL from CORE_SYSTEM_URL, defaulting to ws://core-system:3001');
+    return 'ws://core-system:3001';
   }
 };
 

@@ -129,10 +129,32 @@ const rgbaFromHex = (hexColor, alpha = 0.15) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
+const deriveThingIdFromAction = (action) => {
+  if (!action || typeof action !== 'object') {
+    return null;
+  }
+
+  if (action.thingId) {
+    return action.thingId;
+  }
+
+  if (action.thing && typeof action.thing === 'object') {
+    return action.thing.id || action.thing.thingId || null;
+  }
+
+  if (typeof action.id === 'string' && action.id.includes('::')) {
+    const [thingId] = action.id.split('::');
+    return thingId || null;
+  }
+
+  return null;
+};
+
 function App() {
   const [ui, setUi] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [actionState, setActionState] = useState({ status: null, message: null });
+  const [controlValues, setControlValues] = useState({});
 
   useEffect(() => {
     const ws = new WebSocket(websocketUrl);
@@ -190,6 +212,7 @@ function App() {
     setActionState({ status: 'pending', message: 'Sending action…' });
 
     try {
+      const inferredThingId = metadata.thingId || deriveThingIdFromAction(actionPayload) || ui?.context?.thingId || ui?.thingId || null;
       const response = await fetch(`${deviceApiBase}/api/execute-action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -200,6 +223,7 @@ function App() {
             component: metadata.component,
             label: metadata.label,
             value: metadata.value,
+            thingId: inferredThingId,
             timestamp: new Date().toISOString(),
           },
         }),
@@ -218,6 +242,26 @@ function App() {
     } catch (error) {
       setActionState({ status: 'error', message: error.message || 'Failed to execute action.' });
     }
+  }, []);
+
+  const resolveControlKey = useCallback((componentType, props = {}) => {
+    return (
+      props.id
+      || props.name
+      || props.label
+      || props.title
+      || props.placeholder
+      || props.action?.id
+      || props.action?.name
+      || `${componentType}-${props.componentId || 'default'}`
+    );
+  }, []);
+
+  const updateControlValue = useCallback((key, value) => {
+    setControlValues((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
   }, []);
 
   const renderUi = (element) => {
@@ -241,6 +285,12 @@ function App() {
 
     const type = element.component || element.type;
     const props = element.props || element;
+    const children = props.children || props.components || element.children;
+    const normalizedChildren = Array.isArray(children)
+      ? children
+      : children
+        ? [children]
+        : [];
 
     if (!type) {
       return null;
@@ -258,13 +308,13 @@ function App() {
               background: rgbaFromHex(primaryColor, 0.08),
             }}
           >
-            {Array.isArray(props.children) && props.children.map((child, index) => (
+            {normalizedChildren.map((child, index) => (
               <React.Fragment key={index}>{renderUi(child)}</React.Fragment>
             ))}
           </div>
         );
       case 'text':
-        return <p style={{ margin: '8px 0', fontSize: '16px' }}>{props.content}</p>;
+        return <p style={{ margin: '8px 0', fontSize: '16px' }}>{props.content || props.text}</p>;
       case 'button':
         return (
           <button
@@ -279,9 +329,9 @@ function App() {
               cursor: props.action ? 'pointer' : 'default',
               margin: '6px 0',
             }}
-            onClick={props.action ? () => executeAction(props.action, { component: 'button', label: props.label || props.content }) : null}
+            onClick={props.action ? () => executeAction(props.action, { component: 'button', label: props.label || props.content || props.text, thingId: props.action?.thingId }) : null}
           >
-            {props.label || props.content}
+            {props.label || props.content || props.text}
           </button>
         );
       case 'input':
@@ -310,17 +360,184 @@ function App() {
           >
             <input
               type="checkbox"
-              checked={props.checked}
+              checked={typeof props.checked === 'boolean' ? props.checked : false}
               onChange={(event) => {
                 if (!props.action) return;
                 const nextValue = event.target.checked;
-                executeAction(props.action, { component: 'toggle', label: props.label, value: nextValue });
+                executeAction(props.action, { component: 'toggle', label: props.label, value: nextValue, thingId: props.action?.thingId });
               }}
               style={{ accentColor: primaryColor, width: '18px', height: '18px' }}
             />
             {props.label}
           </label>
         );
+      case 'slider': {
+        const key = resolveControlKey('slider', props);
+        const min = typeof props.min === 'number' ? props.min : 0;
+        const max = typeof props.max === 'number' ? props.max : 100;
+        const step = typeof props.step === 'number' ? props.step : 1;
+        const defaultValue = typeof props.value === 'number' ? props.value : min;
+        const currentValue =
+          Object.prototype.hasOwnProperty.call(controlValues, key) ? controlValues[key] : defaultValue;
+        const unitSuffix = props.unit ? ` ${props.unit}` : '';
+        const sendMode = props.trigger === 'change' ? 'change' : 'commit';
+        const commitValue = (value) => {
+          if (!props.action) {
+            return;
+          }
+
+          executeAction(props.action, {
+            component: 'slider',
+            label: props.label,
+            value,
+            thingId: props.action?.thingId,
+          });
+        };
+
+        return (
+          <div style={{ margin: '16px 0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span style={{ fontWeight: 600 }}>{props.label}</span>
+              <span style={{ color: '#4d4f54' }}>
+                {currentValue}
+                {unitSuffix}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={currentValue}
+              onChange={(event) => {
+                const nextValue = Number(event.target.value);
+                updateControlValue(key, nextValue);
+                if (sendMode === 'change') {
+                  commitValue(nextValue);
+                }
+              }}
+              onMouseUp={(event) => {
+                if (sendMode === 'commit') {
+                  commitValue(Number(event.target.value));
+                }
+              }}
+              onTouchEnd={(event) => {
+                if (sendMode === 'commit') {
+                  commitValue(Number(event.target.value));
+                }
+              }}
+              style={{ width: '100%' }}
+            />
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: '13px',
+                color: '#6c6f75',
+                marginTop: '4px',
+              }}
+            >
+              <span>{min}{unitSuffix}</span>
+              <span>{max}{unitSuffix}</span>
+            </div>
+          </div>
+        );
+      }
+      case 'dropdown': {
+        const key = resolveControlKey('dropdown', props);
+        const options = Array.isArray(props.options) ? props.options : [];
+        const defaultValue = props.value ?? options[0]?.value ?? '';
+        const currentValue =
+          Object.prototype.hasOwnProperty.call(controlValues, key) ? controlValues[key] : defaultValue;
+
+        return (
+          <label style={{ display: 'block', margin: '14px 0' }}>
+            <span style={{ display: 'block', marginBottom: '6px', fontWeight: 600 }}>{props.label}</span>
+            <select
+              value={currentValue}
+              onChange={(event) => {
+                const nextValue = event.target.value;
+                updateControlValue(key, nextValue);
+                if (props.action) {
+                  executeAction(props.action, {
+                    component: 'dropdown',
+                    label: props.label,
+                    value: nextValue,
+                    thingId: props.action?.thingId,
+                  });
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: `1px solid ${rgbaFromHex(primaryColor, 0.45)}`,
+                background: '#ffffff',
+              }}
+            >
+              {props.placeholder && (
+                <option value="" disabled={Boolean(defaultValue)}>
+                  {props.placeholder}
+                </option>
+              )}
+              {options.map((option) => (
+                <option key={option.value || option.label} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        );
+      }
+      case 'statusCard': {
+        const tone = props.tone || 'info';
+        const palette = {
+          info: { background: rgbaFromHex(primaryColor, 0.12), text: primaryColor },
+          success: { background: '#E6F4EA', text: '#0B8A37' },
+          warning: { background: '#FFF4E5', text: '#B45309' },
+          danger: { background: '#FEECEC', text: '#C62828' },
+        };
+        const resolved = palette[tone] || palette.info;
+        const items = Array.isArray(props.items) ? props.items : [];
+
+        return (
+          <div
+            style={{
+              background: resolved.background,
+              borderRadius: '16px',
+              padding: '16px',
+              margin: '14px 0',
+              color: resolved.text,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              {props.icon && <span style={{ fontSize: '18px' }}>{props.icon}</span>}
+              <span style={{ fontWeight: 600, color: '#2f3238' }}>{props.title}</span>
+            </div>
+            {props.value && (
+              <div style={{ fontSize: '28px', fontWeight: 700, color: resolved.text }}>{props.value}</div>
+            )}
+            {items.length > 0 && (
+              <div style={{ marginTop: '12px', display: 'grid', gap: '6px' }}>
+                {items.map((item, index) => (
+                  <div
+                    key={`${item.label}-${index}`}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      color: '#2f3238',
+                      fontSize: '14px',
+                    }}
+                  >
+                    <span>{item.label}</span>
+                    <span style={{ fontWeight: 600 }}>{item.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      }
       default:
         return null;
     }

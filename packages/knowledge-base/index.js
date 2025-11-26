@@ -14,9 +14,9 @@ app.get('/health', (_req, res) => {
 });
 const port = Number.parseInt(process.env.KNOWLEDGE_BASE_PORT || '3005', 10);
 const listenAddress = process.env.BIND_ADDRESS || '0.0.0.0';
-const serviceRegistryUrl = process.env.SERVICE_REGISTRY_URL || 'http://localhost:3000';
-const knowledgeBasePublicUrl = process.env.KNOWLEDGE_BASE_PUBLIC_URL || `http://localhost:${port}`;
-const llmEndpoint = process.env.LLM_ENDPOINT || 'http://localhost:1234/v1/chat/completions';
+const serviceRegistryUrl = process.env.SERVICE_REGISTRY_URL || 'http://core-system:3000';
+const knowledgeBasePublicUrl = process.env.KNOWLEDGE_BASE_PUBLIC_URL || `http://knowledge-base:${port}`;
+const llmEndpoint = process.env.LLM_ENDPOINT || 'http://host.docker.internal:1234/v1/chat/completions';
 const llmDefaultModel = process.env.LLM_MODEL || 'gemma 3b';
 
 const openRouterApiKey = process.env.OPENROUTER_API_KEY || null;
@@ -300,7 +300,7 @@ const seedKnowledgeBase = () => {
 
 seedKnowledgeBase();
 
-const retrieveRelevantDocuments = ({ prompt, thingDescription, capabilityData, capabilities, missingCapabilities, device, uiContext }) => {
+const retrieveRelevantDocuments = ({ prompt, thingDescription, capabilityData, capabilities, missingCapabilities, device, uiContext, thingActions }) => {
   if (!documents.length) return [];
 
   const querySegments = [];
@@ -325,6 +325,9 @@ const retrieveRelevantDocuments = ({ prompt, thingDescription, capabilityData, c
   }
   if (uiContext) {
     querySegments.push(JSON.stringify(uiContext));
+  }
+  if (Array.isArray(thingActions) && thingActions.length > 0) {
+    querySegments.push(JSON.stringify({ thingActions }));
   }
 
   const query = querySegments.filter(Boolean).join('\n');
@@ -482,7 +485,7 @@ const runDeviceSelection = async ({
     return parsed;
   };
 
-async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema = {}, capabilityData, missingCapabilities, device, deviceId, selection }) {
+async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema = {}, capabilityData, missingCapabilities, device, deviceId, selection, thingActions = [] }) {
   const availableComponents = uiSchema.components || {};
   const availableComponentNames = Object.keys(availableComponents);
   const availableTools = uiSchema.tools || {};
@@ -505,6 +508,7 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
     missingCapabilities,
     device,
     uiContext: uiSchema.context,
+    thingActions,
   });
 
   if (retrievedDocuments.length) {
@@ -608,6 +612,39 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
     });
   }
 
+  if (Array.isArray(thingActions) && thingActions.length > 0) {
+    const actionSummaries = thingActions.map((action) => {
+      const transport = action.transport || {};
+      const url = transport.url || (action.forms && action.forms[0]?.url) || 'unknown endpoint';
+      const method = transport.method || (action.forms && action.forms[0]?.method) || 'POST';
+      const capability = action.metadata?.capability ? `Capability: ${action.metadata.capability}. ` : '';
+      const intentAliases = Array.isArray(action.metadata?.intentAliases) && action.metadata.intentAliases.length > 0
+        ? `Intent aliases: ${action.metadata.intentAliases.join(', ')}. `
+        : '';
+      return `- ${action.title || action.name || action.id} (id: ${action.id}) — ${action.description || 'No description provided.'} ${capability}${intentAliases}Invoke via ${method} ${url}.`;
+    }).join('\n');
+
+    messages.push({
+      role: 'system',
+      content: `The target Thing exposes these WoT actions:
+${actionSummaries}
+Reference the action id in generated components so downstream services can invoke them without hard-coding transport details. If you introduce a higher-level control, you must map it to either an existing action id or one of the documented intent aliases—do NOT invent new command names or payload shapes.`,
+    });
+
+    const allowedActionIds = thingActions.map((action) => action.id).filter(Boolean);
+    if (allowedActionIds.length > 0) {
+      messages.push({
+        role: 'system',
+        content: `STRICT REQUIREMENT: Only the following action ids may appear in the generated UI: ${allowedActionIds.join(', ')}. Every button, toggle, slider, or interactive component must reference one of these ids (either by copying the full descriptor or by setting an object such as { "type": "thingAction", "id": "<allowed-id>" }). If no provided action satisfies a user need, omit the control entirely instead of inventing command names (e.g., never output "setPower").`,
+      });
+    }
+  } else {
+    messages.push({
+      role: 'system',
+      content: 'No executable Thing actions are available. Do not create interactive components that attempt to call missing actions; focus on informative or read-only UI elements until actions are registered.',
+    });
+  }
+
   if (selection?.reason && device?.name) {
     messages.push({
       role: 'system',
@@ -623,6 +660,7 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
     capabilityData,
     missingCapabilities,
     selection,
+    thingActions,
   };
 
   messages.push({
@@ -909,7 +947,7 @@ app.post('/select-device', async (req, res) => {
 });
 
 app.post('/query', async (req, res) => {
-  const { prompt, thingDescription, capabilities, schema, capabilityData, missingCapabilities, device, deviceId, selection } = req.body;
+  const { prompt, thingDescription, capabilities, schema, capabilityData, missingCapabilities, device, deviceId, selection, thingActions } = req.body;
   console.log('[KB] /query invoked', {
     promptPreview: typeof prompt === 'string' ? `${prompt.slice(0, 60)}${prompt.length > 60 ? '…' : ''}` : null,
     capabilities,
@@ -926,7 +964,8 @@ app.post('/query', async (req, res) => {
       missingCapabilities,
   device,
   deviceId,
-  selection,
+      selection,
+      thingActions,
     });
 
     if (!generatedUi || Object.keys(generatedUi).length === 0) {

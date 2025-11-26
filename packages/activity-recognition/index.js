@@ -10,9 +10,9 @@ const port = Number.parseInt(process.env.ACTIVITY_RECOGNITION_PORT || process.en
 const serviceName = 'activity-recognition';
 const capabilityAlias = 'userActivity';
 const listenAddress = process.env.BIND_ADDRESS || '0.0.0.0';
-const coreSystemBaseUrl = process.env.CORE_SYSTEM_URL || 'http://localhost:3001';
-const serviceRegistryUrl = process.env.SERVICE_REGISTRY_URL || 'http://localhost:3000';
-const publicUrl = process.env.ACTIVITY_RECOGNITION_PUBLIC_URL || process.env.CAPABILITY_PUBLIC_URL || `http://localhost:${port}`;
+const coreSystemBaseUrl = process.env.CORE_SYSTEM_URL || 'http://core-system:3001';
+const serviceRegistryUrl = process.env.SERVICE_REGISTRY_URL || 'http://core-system:3000';
+const publicUrl = process.env.ACTIVITY_RECOGNITION_PUBLIC_URL || process.env.CAPABILITY_PUBLIC_URL || `http://activity-recognition:${port}`;
 const coreRefreshEndpoint = `${coreSystemBaseUrl}/refresh`;
 const activityRotationIntervalMs = Number.parseInt(process.env.ACTIVITY_ROTATION_INTERVAL_MS || '90000', 10);
 

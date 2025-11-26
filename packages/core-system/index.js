@@ -6,6 +6,14 @@ import fetch from 'node-fetch';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  ensureThingActions,
+  getActionById,
+  getActionsForThing,
+  registerActionProvider,
+} from './action-registry.js';
+import thingDescriptionActionProvider from './plugins/thing-description-action-provider.js';
+import { attachThingActionsToUi } from './ui-action-augmenter.js';
 
 const app = express();
 app.use(express.json());
@@ -22,10 +30,10 @@ const port = Number.parseInt(process.env.CORE_SYSTEM_PORT || '3001', 10);
 const registryPort = Number.parseInt(process.env.SERVICE_REGISTRY_PORT || '3000', 10);
 const uiRefreshIntervalMs = 60000;
 const fallbackPrompt = 'Analyze the registered devices, their schemas, and capabilities. Select the best-suited target automatically, then design a responsive UI with clear state feedback and appropriate theming cues for the referenced thing.';
-const corePublicUrl = process.env.CORE_SYSTEM_PUBLIC_URL || `http://localhost:${port}`;
-const registryPublicUrl = process.env.SERVICE_REGISTRY_PUBLIC_URL || `http://localhost:${registryPort}`;
+const corePublicUrl = process.env.CORE_SYSTEM_PUBLIC_URL || `http://core-system:${port}`;
+const registryPublicUrl = process.env.SERVICE_REGISTRY_PUBLIC_URL || `http://core-system:${registryPort}`;
 const serviceRegistryUrl = process.env.SERVICE_REGISTRY_URL || registryPublicUrl;
-const knowledgeBaseUrl = process.env.KNOWLEDGE_BASE_URL || 'http://localhost:3005';
+const knowledgeBaseUrl = process.env.KNOWLEDGE_BASE_URL || 'http://knowledge-base:3005';
 const listenAddress = process.env.BIND_ADDRESS || '0.0.0.0';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -46,6 +54,8 @@ const deviceRegistry = new Map();
 const deviceSockets = new Map(); // deviceId -> Set<WebSocket>
 const latestUiByDevice = new Map(); // deviceId -> last generated UI definition
 const thingRegistry = new Map(); // thingId -> { id, description, metadata, registeredAt }
+
+registerActionProvider(thingDescriptionActionProvider);
 
 const nowIsoString = () => new Date().toISOString();
 
@@ -236,6 +246,7 @@ const registrySnapshot = () => ({
     metadata: thing.metadata,
     registeredAt: thing.registeredAt,
     lastHeartbeat: thing.lastHeartbeat,
+    actions: getActionsForThing(thing.id),
   })),
 });
 
@@ -680,6 +691,12 @@ const generateUiForDevice = async ({
     }
   }
 
+  const normalizedThingActions = ensureThingActions({
+    thingId: targetDevice?.thingId || resolvedThingDescription?.id || null,
+    thingDescription: resolvedThingDescription,
+    metadata: targetDevice?.metadata,
+  });
+
   const { capabilityData, missingCapabilities } = await collectCapabilityData(resolvedCapabilities, {
     prompt: resolvedPrompt,
     deviceId: targetDeviceId,
@@ -729,6 +746,7 @@ const generateUiForDevice = async ({
       raw: selectionMeta.raw,
       targetDeviceId,
     },
+    thingActions: normalizedThingActions,
   };
 
   console.log(`[Core] Generating UI for device '${targetDeviceId}' with capabilities: ${resolvedCapabilities.join(', ') || 'none'} (reason: ${selectionMeta.reason})`);
@@ -764,6 +782,11 @@ const generateUiForDevice = async ({
     };
   }
 
+  generatedUi = attachThingActionsToUi(generatedUi, {
+    thingActions: normalizedThingActions,
+    defaultThingId: targetDevice?.thingId || resolvedThingDescription?.id || null,
+  });
+
   if (broadcast) {
     dispatchUiToClients(targetDeviceId, generatedUi);
     console.log(`[Core] Dispatched UI to device '${targetDeviceId}'.`);
@@ -780,6 +803,25 @@ const scheduleDeviceUiRefresh = () => {
       });
     });
   }, uiRefreshIntervalMs);
+};
+
+const refreshDevicesAssociatedWithThing = (thingId) => {
+  if (!thingId) {
+    return;
+  }
+
+  deviceRegistry.forEach((deviceRecord) => {
+    const associatedThingId = deviceRecord.thingId || deviceRecord.thingDescription?.id || null;
+    if (associatedThingId === thingId) {
+      generateUiForDevice({ deviceId: deviceRecord.id })
+        .then(() => {
+          console.log(`[Core] Regenerated UI for device '${deviceRecord.id}' after thing '${thingId}' registration.`);
+        })
+        .catch((error) => {
+          console.error(`Failed to refresh UI for device ${deviceRecord.id} after thing '${thingId}' registration:`, error.message);
+        });
+    }
+  });
 };
 
 const registryApp = express();
@@ -915,6 +957,21 @@ app.get('/registry', (_req, res) => {
   res.json(registrySnapshot());
 });
 
+app.get('/things/:thingId/actions', (req, res) => {
+  const { thingId } = req.params;
+  const actions = getActionsForThing(thingId) || [];
+  res.json({ thingId, count: actions.length, actions });
+});
+
+app.get('/actions/:actionId', (req, res) => {
+  const actionId = decodeURIComponent(req.params.actionId);
+  const action = getActionById(actionId);
+  if (!action) {
+    return res.status(404).json({ error: `Action '${actionId}' not found.` });
+  }
+  res.json({ action });
+});
+
 app.post('/register/capability', (req, res) => {
   const { name, url, provides = [], metadata = {}, endpoints = {}, endpoint, defaultEndpoint, tools = {} } = req.body;
 
@@ -968,9 +1025,12 @@ app.post('/register/thing', (req, res) => {
     lastHeartbeat: lastHeartbeat || nowIsoString(),
   };
 
+  record.actions = ensureThingActions({ thingId: id, thingDescription: description, metadata });
   thingRegistry.set(id, record);
   console.log(`Thing registered: ${id}`);
   res.json({ status: 'registered', thing: record });
+
+  setTimeout(() => refreshDevicesAssociatedWithThing(id), 0);
 });
 
 app.post('/register/device', (req, res) => {
@@ -995,6 +1055,16 @@ app.post('/register/device', (req, res) => {
     registeredAt: nowIsoString(),
     lastHeartbeat: nowIsoString(),
   };
+
+  const resolvedThingId = thingId || thingDescription?.id || null;
+  if (thingDescription) {
+    ensureThingActions({ thingId: resolvedThingId, thingDescription, metadata });
+  } else if (thingId) {
+    const registeredThing = thingRegistry.get(thingId);
+    if (registeredThing?.description) {
+      ensureThingActions({ thingId, thingDescription: registeredThing.description, metadata: registeredThing.metadata });
+    }
+  }
 
   deviceRegistry.set(id, record);
   serviceRegistryByType.device.set(id, {
