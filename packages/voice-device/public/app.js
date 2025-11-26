@@ -5,6 +5,8 @@ const lastAction = document.querySelector('#last-action');
 const lightStatus = document.querySelector('#light-status');
 const deviceDescription = document.querySelector('#device-description');
 const sampleCommandsList = document.querySelector('#sample-commands');
+const promptSuggestionsSection = document.querySelector('#prompt-suggestions-section');
+const promptSuggestionsList = document.querySelector('#prompt-suggestions');
 const unsupportedSection = document.querySelector('#unsupported');
 
 const startBtn = document.querySelector('#start-btn');
@@ -20,6 +22,7 @@ let lastUiEventId;
 let lastAutoListenAttempt = 0;
 let userGrantedMic = false;
 let unloadHandlerRegistered = false;
+let currentPromptSuggestions = [];
 
 const AUTO_LISTEN_COOLDOWN_MS = 8000;
 const RECONNECT_DELAY_MS = 4000;
@@ -191,6 +194,45 @@ const populateSampleCommands = (samples) => {
   });
 };
 
+const renderPromptSuggestions = (suggestions = []) => {
+  if (!promptSuggestionsSection || !promptSuggestionsList) {
+    return;
+  }
+
+  const normalized = suggestions
+    .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+    .filter(Boolean);
+
+  currentPromptSuggestions = normalized;
+  promptSuggestionsList.innerHTML = '';
+
+  promptSuggestionsSection.hidden = false;
+
+  normalized.forEach((suggestion) => {
+    const li = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'prompt-suggestion-btn';
+    button.textContent = suggestion;
+    button.addEventListener('click', () => handleTranscript(suggestion));
+    li.appendChild(button);
+    promptSuggestionsList.appendChild(li);
+  });
+};
+
+const extractPromptSuggestions = (uiDefinition) => {
+  if (!uiDefinition || !Array.isArray(uiDefinition.components)) {
+    return [];
+  }
+
+  const promptsComponent = uiDefinition.components.find((component) => component.type === 'prompts');
+  if (!promptsComponent) {
+    return [];
+  }
+
+  return Array.isArray(promptsComponent.suggestions) ? promptsComponent.suggestions : [];
+};
+
 const resolveWebsocketUrl = () => {
   if (!config?.coreWebsocketUrl) {
     return null;
@@ -271,6 +313,9 @@ const handleUiUpdate = (payload) => {
   if (eventId) {
     lastUiEventId = eventId;
   }
+
+  const suggestions = extractPromptSuggestions(payload.ui);
+  renderPromptSuggestions(suggestions);
 
   maybeAutoStartListening('Core system routed the latest UI to this voice device.');
 };

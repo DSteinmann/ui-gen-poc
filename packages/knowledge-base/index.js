@@ -29,7 +29,7 @@ const openRouterReasoningEffort = process.env.OPENROUTER_REASONING_EFFORT || nul
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const outputSchema = JSON.parse(fs.readFileSync(path.join(__dirname, '../core-system/output.schema.json'), 'utf-8'));
+const defaultOutputSchema = JSON.parse(fs.readFileSync(path.join(__dirname, '../core-system/output.schema.json'), 'utf-8'));
 
 const deviceSelectionJsonSchema = {
   $schema: 'http://json-schema.org/draft-07/schema#',
@@ -488,7 +488,14 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
   const availableTools = uiSchema.tools || {};
   const availableToolNames = Object.keys(availableTools);
 
-  const filteredSchema = JSON.parse(JSON.stringify(outputSchema));
+  const responseSchemaSource =
+    (uiSchema && typeof uiSchema === 'object'
+      && (uiSchema.responseSchema || uiSchema.outputSchema || uiSchema.jsonSchema))
+      || defaultOutputSchema;
+
+  const filteredSchema = responseSchemaSource
+    ? JSON.parse(JSON.stringify(responseSchemaSource))
+    : null;
 
   const retrievedDocuments = retrieveRelevantDocuments({
     prompt,
@@ -504,26 +511,28 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
     console.log('Retrieved documents for context:', retrievedDocuments.map((doc) => `${doc.id} (score ${doc.score.toFixed(3)})`));
   }
 
-  for (const key in filteredSchema.definitions) {
-    if (key.endsWith('Component') && !availableComponentNames.includes(key.replace('Component', ''))) {
-      delete filteredSchema.definitions[key];
+  if (filteredSchema?.definitions) {
+    for (const key in filteredSchema.definitions) {
+      if (key.endsWith('Component') && !availableComponentNames.includes(key.replace('Component', ''))) {
+        delete filteredSchema.definitions[key];
+      }
     }
-  }
 
-  if (filteredSchema.definitions.component?.oneOf) {
-    filteredSchema.definitions.component.oneOf = filteredSchema.definitions.component.oneOf.filter((ref) => {
-      const componentName = ref.$ref.split('/').pop().replace('Component', '');
-      return availableComponentNames.includes(componentName) || componentName === 'toolCall';
-    });
-  }
+    if (filteredSchema.definitions.component?.oneOf) {
+      filteredSchema.definitions.component.oneOf = filteredSchema.definitions.component.oneOf.filter((ref) => {
+        const componentName = ref.$ref.split('/').pop().replace('Component', '');
+        return availableComponentNames.includes(componentName) || componentName === 'toolCall';
+      });
+    }
 
-  if (filteredSchema.definitions.toolCall) {
-    if (availableToolNames.length > 0) {
-      filteredSchema.definitions.toolCall.properties.tool.enum = availableToolNames;
-    } else {
-      delete filteredSchema.definitions.toolCall;
-      if (filteredSchema.definitions.component?.oneOf) {
-        filteredSchema.definitions.component.oneOf = filteredSchema.definitions.component.oneOf.filter((ref) => ref.$ref !== '#/definitions/toolCall');
+    if (filteredSchema.definitions.toolCall) {
+      if (availableToolNames.length > 0) {
+        filteredSchema.definitions.toolCall.properties.tool.enum = availableToolNames;
+      } else {
+        delete filteredSchema.definitions.toolCall;
+        if (filteredSchema.definitions.component?.oneOf) {
+          filteredSchema.definitions.component.oneOf = filteredSchema.definitions.component.oneOf.filter((ref) => ref.$ref !== '#/definitions/toolCall');
+        }
       }
     }
   }
@@ -645,11 +654,17 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
   let schemaReminderAdded = false;
   let attemptsWithoutTool = 0;
   const maxAttemptsWithoutTool = 2;
-  let enforceSchema = availableToolNames.length === 0;
+  const schemaAvailable = Boolean(filteredSchema);
+  let enforceSchema = schemaAvailable && availableToolNames.length === 0;
+
+  const resolvedModel = openRouterModel || llmDefaultModel;
+  if (!resolvedModel) {
+    throw new Error('No LLM model configured. Set OPENROUTER_MODEL or LLM_MODEL in the environment.');
+  }
 
   while (true) {
     const requestPayload = {
-      model: uiSchema.model || openRouterModel || llmDefaultModel,
+      model: resolvedModel,
       messages,
       temperature: 0.7,
     };
@@ -659,13 +674,14 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
       requestPayload.tool_choice = 'auto';
     }
 
-    if (enforceSchema) {
+    if (enforceSchema && filteredSchema) {
       requestPayload.response_format = {
         type: 'json_schema',
         json_schema: { schema: filteredSchema },
       };
     }
 
+    console.log(requestPayload);
     const { data: llmData, provider } = await invokeChatCompletion(requestPayload, { contextLabel: 'ui-generation' });
     console.log(`[KB] LLM provider ${provider} returned data for ui-generation (schema enforced? ${enforceSchema}).`);
     console.log('LLM Data:', llmData);

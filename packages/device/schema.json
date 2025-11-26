@@ -1,16 +1,27 @@
 {
-  "name": "end-device",
-  "model": "mistralai/magistral-small-2509",
+  "name": "smartphone-light-switch-ui",
   "tools": {
     "getAmbientLight": {
       "description": "Gets the current ambient light level from the device's sensor.",
-      "returns": "string"
+      "returns": "string",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
     }
   },
   "components": {
+    "text": {
+      "props": {
+        "text": "string",
+        "variant": "string"
+      }
+    },
     "button": {
       "props": {
         "label": "string",
+        "style": "string",
         "action": "object"
       }
     },
@@ -21,20 +32,139 @@
         "action": "object"
       }
     },
-    "text": {
-      "props": {
-        "content": "string"
-      }
-    },
-    "input": {
-      "props": {
-        "type": "string",
-        "placeholder": "string"
-      }
-    },
     "container": {
       "props": {
-        "children": "array"
+        "children": "array",
+        "layout": "string"
+      }
+    }
+  },
+  "theming": {
+    "description": "Supports root `theme.primaryColor` (hex color) for accent styling.",
+    "supportsPrimaryColor": true,
+    "defaultPrimaryColor": "#1f6feb"
+  },
+  "context": {
+    "controlledThing": "light-switch",
+    "modalityPreference": "visual-first"
+  },
+  "responseSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Smartphone UI Schema",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "deviceId": {
+        "type": "string",
+        "description": "Identifier of the target device that should render this UI definition."
+      },
+      "generatedAt": {
+        "type": "string",
+        "format": "date-time",
+        "description": "Timestamp indicating when the UI was generated."
+      },
+      "context": {
+        "type": "object",
+        "description": "Arbitrary context metadata (thing references, device info, etc.).",
+        "additionalProperties": true
+      },
+      "theme": {
+        "type": "object",
+        "properties": {
+          "primaryColor": {
+            "type": "string",
+            "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+            "description": "Hexadecimal color value representing the preferred primary accent color."
+          }
+        },
+        "additionalProperties": false
+      },
+      "components": {
+        "type": "array",
+        "minItems": 1,
+        "items": { "$ref": "#/definitions/component" }
+      }
+    },
+    "required": ["components"],
+    "definitions": {
+      "component": {
+        "oneOf": [
+          { "$ref": "#/definitions/containerComponent" },
+          { "$ref": "#/definitions/textComponent" },
+          { "$ref": "#/definitions/buttonComponent" },
+          { "$ref": "#/definitions/toggleComponent" },
+          { "$ref": "#/definitions/toolCall" }
+        ]
+      },
+      "containerComponent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": { "const": "container" },
+          "title": { "type": "string" },
+          "layout": { "type": "string" },
+          "children": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "#/definitions/component" }
+          }
+        },
+        "required": ["type", "children"]
+      },
+      "textComponent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": { "const": "text" },
+          "text": { "type": "string" },
+          "variant": { "type": "string" },
+          "tone": { "type": "string" }
+        },
+        "required": ["type", "text"]
+      },
+      "buttonComponent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": { "const": "button" },
+          "label": { "type": "string" },
+          "icon": { "type": "string" },
+          "style": { "type": "string" },
+          "action": {
+            "description": "Action payload or identifier to execute when the button is pressed.",
+            "oneOf": [
+              { "type": "string" },
+              { "type": "object", "additionalProperties": true }
+            ]
+          }
+        },
+        "required": ["type", "label"]
+      },
+      "toggleComponent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": { "const": "toggle" },
+          "label": { "type": "string" },
+          "checked": { "type": "boolean" },
+          "action": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "object", "additionalProperties": true }
+            ]
+          }
+        },
+        "required": ["type", "label"]
+      },
+      "toolCall": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": { "const": "toolCall" },
+          "tool": { "type": "string" },
+          "parameters": { "type": "object", "additionalProperties": true }
+        },
+        "required": ["type", "tool"]
       }
     }
   }

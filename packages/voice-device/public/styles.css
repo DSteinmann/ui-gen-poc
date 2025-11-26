@@ -122,6 +122,35 @@ button.ghost:hover:not(:disabled) {
   margin-bottom: 0.35rem;
 }
 
+#prompt-suggestions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+#prompt-suggestions li {
+  margin: 0;
+}
+
+.prompt-suggestion-btn {
+  border: 1px solid rgba(240, 246, 252, 0.2);
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  background: rgba(88, 166, 255, 0.15);
+  color: #f0f6fc;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.prompt-suggestion-btn:hover {
+  background: rgba(88, 166, 255, 0.35);
+  transform: translateY(-1px);
+}
+
 @media (max-width: 600px) {
   .label {
     min-width: 110px;

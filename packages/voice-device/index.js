@@ -121,6 +121,7 @@ const voiceUiSchema = {
     text: { description: 'Narrative text for voice-first feedback.' },
     button: { description: 'Action button that can initiate or stop listening.' },
     transcript: { description: 'Displays the latest recognized voice command.' },
+    prompts: { description: 'Suggested voice commands for user assistance.' },
   },
   context: {
     modalityPreference: 'audio-first',
@@ -138,7 +139,7 @@ const registerWithCoreSystem = async () => {
     capabilities: [],
     metadata: {
       deviceType: 'voice-headset',
-      supportedUiComponents: ['text', 'button', 'transcript'],
+      supportedUiComponents: ['text', 'button', 'transcript', 'prompts'],
       supportsAudio: true,
       supportsDictation: true,
       supportsTouch: false,

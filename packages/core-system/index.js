@@ -33,6 +33,9 @@ const __dirname = path.dirname(__filename);
 const promptsDir = path.resolve(__dirname, 'prompts');
 let cachedGeneralDefaultPrompt;
 
+const defaultResponseSchemaPath = path.resolve(__dirname, 'output.schema.json');
+const defaultResponseSchema = JSON.parse(readFileSync(defaultResponseSchemaPath, 'utf-8'));
+
 const serviceRegistryByType = {
   generic: new Map(),
   capability: new Map(),
@@ -605,6 +608,13 @@ const generateUiForDevice = async ({
   if (!resolvedSchema.name) {
     resolvedSchema.name = targetDevice.id;
   }
+
+  const resolvedResponseSchema =
+    (resolvedSchema && typeof resolvedSchema === 'object'
+      && (resolvedSchema.responseSchema || resolvedSchema.outputSchema || resolvedSchema.jsonSchema))
+      || defaultResponseSchema;
+
+  resolvedSchema.responseSchema = resolvedResponseSchema;
 
   const capabilityTools = {};
   resolvedCapabilities.forEach((capabilityName) => {

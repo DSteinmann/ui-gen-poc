@@ -1,5 +1,8 @@
 import express from 'express';
 import fetch from 'node-fetch';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const app = express();
 const port = Number.parseInt(process.env.DEVICE_API_PORT || '3002', 10);
@@ -11,6 +14,11 @@ const devicePublicUrl = process.env.DEVICE_API_PUBLIC_URL || `http://localhost:$
 app.use(express.json());
 
 const deviceId = 'device-smartphone-001';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const schemaPath = path.resolve(__dirname, '..', 'schema.json');
+const uiSchema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
 
 const registerWithServiceRegistry = async () => {
   try {
@@ -33,37 +41,22 @@ const registerWithServiceRegistry = async () => {
   }
 };
 
-const uiSchema = {
-  name: 'smartphone-light-switch-ui',
-  components: {
-    text: { description: 'Status text block.' },
-    button: { description: 'Action button triggering remote actions.' },
-    toggle: { description: 'Switch element representing light state.' },
-  },
-  theming: {
-    description: 'Supports root `theme.primaryColor` (hex color) for accent styling.',
-    supportsPrimaryColor: true,
-    defaultPrimaryColor: '#1f6feb',
-  },
-  context: {
-    controlledThing: 'light-switch',
-    modalityPreference: 'visual-first',
-  },
-};
-
 const registerWithCoreSystem = async () => {
+  const supportedComponents = Object.keys(uiSchema.components || {});
+  const supportsTheming = uiSchema.theming?.supportsPrimaryColor ? ['theme.primaryColor'] : [];
+
   const deviceRegistrationPayload = {
     id: deviceId,
     name: 'Smartphone Controller',
     url: devicePublicUrl,
     thingId: 'thing-light-switch-001',
-  capabilities: [],
+    capabilities: [],
     metadata: {
       deviceType: 'smartphone',
-      supportedUiComponents: ['text', 'button', 'toggle'],
+      supportedUiComponents: supportedComponents,
       supportsAudio: false,
       supportsTouch: true,
-      supportsTheming: ['theme.primaryColor'],
+      supportsTheming: supportsTheming,
       uiSchema,
     },
     uiSchema,
