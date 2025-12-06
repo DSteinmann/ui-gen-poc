@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import './App.css';
 
 const deviceId = 'device-smartphone-001';
 
@@ -129,6 +130,22 @@ const rgbaFromHex = (hexColor, alpha = 0.15) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
+const clampChannel = (value) => Math.max(0, Math.min(255, value));
+
+const adjustHexColor = (hexColor, amount = 0) => {
+  const normalized = normalizeHexColor(hexColor);
+  if (!normalized) {
+    return null;
+  }
+
+  const adjustment = Math.max(-255, Math.min(255, amount));
+  const r = clampChannel(parseInt(normalized.slice(1, 3), 16) + adjustment);
+  const g = clampChannel(parseInt(normalized.slice(3, 5), 16) + adjustment);
+  const b = clampChannel(parseInt(normalized.slice(5, 7), 16) + adjustment);
+
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+};
+
 const normalizeToken = (value) => {
   if (typeof value !== 'string') {
     return null;
@@ -220,6 +237,31 @@ const componentSizePresets = {
       labelGap: '10px',
     },
   },
+};
+
+const toNumericPixels = (value, fallback = 16) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value.replace('px', ''));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  return fallback;
+};
+
+const toPixelString = (value, fallback = 0) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return `${value}px`;
+  }
+
+  if (typeof value === 'string' && value.trim().length) {
+    return value;
+  }
+
+  return `${fallback}px`;
 };
 
 const resolveErgonomicsProfile = (context = {}) => {
@@ -345,6 +387,10 @@ function App() {
     [theme.primaryColor]
   );
   const primaryContrast = useMemo(() => getContrastColor(primaryColor), [primaryColor]);
+  const accentHighlight = useMemo(() => adjustHexColor(primaryColor, 35) || primaryColor, [primaryColor]);
+  const accentShadow = useMemo(() => adjustHexColor(primaryColor, -30) || primaryColor, [primaryColor]);
+  const glassOverlay = useMemo(() => rgbaFromHex(primaryColor, 0.08), [primaryColor]);
+  const subtleBorder = useMemo(() => rgbaFromHex(primaryColor, 0.18), [primaryColor]);
   const ergonomicsProfile = useMemo(() => resolveErgonomicsProfile(ui?.context || {}), [ui]);
 
   useEffect(() => {
@@ -453,22 +499,62 @@ function App() {
     }
 
     switch (type) {
-      case 'container':
+      case 'container': {
+        const layoutToken = normalizeToken(props.layout) || 'column';
+        const isGrid = ['grid', 'tiles', 'masonry'].includes(layoutToken);
+        const isRow = ['row', 'horizontal'].includes(layoutToken);
+        const surfaceVariant = normalizeToken(props.variant) || 'panel';
+        const surfaceBackground =
+          surfaceVariant === 'ghost'
+            ? 'transparent'
+            : surfaceVariant === 'emphasis'
+              ? `linear-gradient(140deg, ${rgbaFromHex(primaryColor, 0.18)}, ${rgbaFromHex(primaryColor, 0.05)})`
+              : `linear-gradient(145deg, rgba(255, 255, 255, 0.98), ${rgbaFromHex(primaryColor, 0.04)})`;
+
+        const containerStyle = {
+          border: `1px solid ${subtleBorder}`,
+          padding: '20px',
+          margin: '12px 0',
+          borderRadius: '20px',
+          background: surfaceBackground,
+          boxShadow:
+            surfaceVariant === 'ghost'
+              ? `inset 0 0 0 1px ${rgbaFromHex(primaryColor, 0.08)}`
+              : '0 18px 30px rgba(15, 23, 42, 0.08)',
+          display: isGrid ? 'grid' : 'flex',
+          flexDirection: isGrid ? undefined : isRow ? 'row' : 'column',
+          flexWrap: isRow ? 'wrap' : 'nowrap',
+          gap: '16px',
+          gridTemplateColumns: isGrid ? 'repeat(auto-fit, minmax(180px, 1fr))' : undefined,
+          backdropFilter: surfaceVariant === 'ghost' ? 'blur(6px)' : 'blur(2px)',
+          position: 'relative',
+          overflow: 'hidden',
+        };
+
         return (
-          <div
-            style={{
-              border: `1px solid ${rgbaFromHex(primaryColor, 0.35)}`,
-              padding: '16px',
-              margin: '12px 0',
-              borderRadius: '12px',
-              background: rgbaFromHex(primaryColor, 0.08),
-            }}
-          >
+          <div style={containerStyle}>
+            {surfaceVariant !== 'ghost' && (
+              <span
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  inset: '-40% auto auto 40%',
+                  width: '120px',
+                  height: '120px',
+                  background: glassOverlay,
+                  filter: 'blur(60px)',
+                  borderRadius: '50%',
+                  opacity: 0.5,
+                  pointerEvents: 'none',
+                }}
+              />
+            )}
             {normalizedChildren.map((child, index) => (
               <React.Fragment key={index}>{renderUi(child)}</React.Fragment>
             ))}
           </div>
         );
+      }
       case 'text':
         {
           const sizeToken = resolveComponentSize(props.size, ergonomicsProfile);
@@ -479,6 +565,8 @@ function App() {
                 margin: textSizing.margin || '8px 0',
                 fontSize: textSizing.fontSize || '16px',
                 lineHeight: textSizing.lineHeight || 1.5,
+                color: props.tone === 'muted' ? '#6b7280' : '#0f172a',
+                fontWeight: props.variant === 'subtitle' ? 600 : 400,
               }}
             >
               {props.content || props.text}
@@ -489,32 +577,63 @@ function App() {
         {
           const sizeToken = resolveComponentSize(props.size, ergonomicsProfile);
           const buttonSizing = getSizingForComponent('button', sizeToken);
+          const emphasis = normalizeToken(props.style) || 'solid';
+          const isGhost = emphasis === 'ghost';
+          const isOutline = emphasis === 'outline';
+          const disabled = Boolean(props.disabled);
+          const hasAction = Boolean(props.action);
+          const gradientFill = `linear-gradient(130deg, ${accentHighlight}, ${accentShadow})`;
+          const background = isGhost || isOutline ? 'transparent' : gradientFill;
+          const borderColor = isGhost ? rgbaFromHex(primaryColor, 0.2) : rgbaFromHex(primaryColor, 0.35);
+          const textColor = disabled ? '#9ca3af' : isGhost || isOutline ? accentShadow : primaryContrast;
+
+          const handleClick = () => {
+            if (disabled) {
+              return;
+            }
+
+            if (!hasAction) {
+              setActionState({ status: 'error', message: 'This button is missing an action binding.' });
+              return;
+            }
+
+            executeAction(props.action, {
+              component: 'button',
+              label: props.label || props.content || props.text,
+              thingId: props.action?.thingId,
+            });
+          };
+
           return (
             <button
+              type="button"
+              disabled={disabled}
               style={{
-                backgroundColor: primaryColor,
-                color: primaryContrast,
-                border: `1px solid ${primaryColor}`,
-                borderRadius: buttonSizing.borderRadius || '10px',
-                padding: buttonSizing.padding || '12px 16px',
+                background,
+                color: textColor,
+                border: `1px solid ${disabled ? '#e5e7eb' : borderColor}`,
+                borderRadius: buttonSizing.borderRadius || '12px',
+                padding: buttonSizing.padding || '12px 18px',
                 fontSize: buttonSizing.fontSize || '16px',
                 fontWeight: 600,
-                cursor: props.action ? 'pointer' : 'default',
+                cursor: disabled ? 'not-allowed' : hasAction ? 'pointer' : 'help',
                 margin: '6px 0',
                 minHeight: buttonSizing.minHeight || '48px',
+                width: props.fullWidth ? '100%' : 'auto',
+                boxShadow: disabled ? 'none' : `0 18px 32px ${rgbaFromHex(primaryColor, 0.3)}`,
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                transform: disabled ? 'none' : 'translateY(0)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                backdropFilter: isGhost ? 'blur(6px)' : 'initial',
+                letterSpacing: '0.02em',
               }}
-              onClick={
-                props.action
-                  ? () =>
-                      executeAction(props.action, {
-                        component: 'button',
-                        label: props.label || props.content || props.text,
-                        thingId: props.action?.thingId,
-                      })
-                  : null
-              }
+              onClick={handleClick}
             >
-              {props.label || props.content || props.text}
+              {props.icon && <span aria-hidden="true">{props.icon}</span>}
+              <span>{props.label || props.content || props.text}</span>
             </button>
           );
         }
@@ -535,31 +654,74 @@ function App() {
       case 'toggle': {
         const sizeToken = resolveComponentSize(props.size, ergonomicsProfile);
         const toggleSizing = getSizingForComponent('toggle', sizeToken);
+        const controlSize = toNumericPixels(toggleSizing.controlSize, 20);
+        const trackWidth = `${controlSize * 2}px`;
+        const knobSize = `${controlSize - 4}px`;
+        const isChecked = typeof props.checked === 'boolean' ? props.checked : false;
+        const inputId = resolveControlKey('toggle', props);
+
         return (
           <label
+            htmlFor={inputId}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: toggleSizing.gap || '10px',
-              padding: `${toggleSizing.paddingY || '8px'} 0`,
+              justifyContent: 'space-between',
+              gap: toggleSizing.gap || '12px',
+              padding: `${toggleSizing.paddingY || '10px'} 0`,
               fontSize: toggleSizing.labelFontSize || '16px',
+              fontWeight: 500,
             }}
           >
+            <span style={{ flex: '1 1 auto', color: '#1f2933' }}>{props.label}</span>
+            <span
+              style={{
+                position: 'relative',
+                width: trackWidth,
+                height: toPixelString(controlSize, 20),
+                background: isChecked
+                  ? `linear-gradient(120deg, ${accentHighlight}, ${accentShadow})`
+                  : 'rgba(148, 163, 184, 0.4)',
+                borderRadius: '999px',
+                padding: '2px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: isChecked ? 'flex-end' : 'flex-start',
+                boxShadow: isChecked
+                  ? `0 6px 18px ${rgbaFromHex(primaryColor, 0.45)}`
+                  : 'inset 0 1px 4px rgba(15, 23, 42, 0.12)',
+                transition: 'background 0.2s ease',
+                cursor: 'pointer',
+              }}
+            >
+              <span
+                style={{
+                  width: knobSize,
+                  height: knobSize,
+                  borderRadius: '999px',
+                  background: '#ffffff',
+                  boxShadow: '0 2px 6px rgba(15, 23, 42, 0.2)',
+                  transition: 'transform 0.2s ease',
+                  transform: 'translateX(0)',
+                }}
+              />
+            </span>
             <input
+              id={inputId}
               type="checkbox"
-              checked={typeof props.checked === 'boolean' ? props.checked : false}
+              checked={isChecked}
               onChange={(event) => {
                 if (!props.action) return;
                 const nextValue = event.target.checked;
-                executeAction(props.action, { component: 'toggle', label: props.label, value: nextValue, thingId: props.action?.thingId });
+                executeAction(props.action, {
+                  component: 'toggle',
+                  label: props.label,
+                  value: nextValue,
+                  thingId: props.action?.thingId,
+                });
               }}
-              style={{
-                accentColor: primaryColor,
-                width: toggleSizing.controlSize || '20px',
-                height: toggleSizing.controlSize || '20px',
-              }}
+              style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
             />
-            <span>{props.label}</span>
           </label>
         );
       }
@@ -575,6 +737,9 @@ function App() {
         const sendMode = props.trigger === 'change' ? 'change' : 'commit';
         const sizeToken = resolveComponentSize(props.size, ergonomicsProfile);
         const sliderSizing = getSizingForComponent('slider', sizeToken);
+        const progress = ((currentValue - min) / (max - min || 1)) * 100;
+        const trackFill = `linear-gradient(90deg, ${accentHighlight} ${progress}%, rgba(148, 163, 184, 0.35) ${progress}%)`;
+
         const commitValue = (value) => {
           if (!props.action) {
             return;
@@ -589,9 +754,9 @@ function App() {
         };
 
         return (
-          <div style={{ margin: `${sliderSizing.blockSpacing || '16px'} 0` }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <span style={{ fontWeight: 600, fontSize: sliderSizing.labelFontSize || '16px' }}>{props.label}</span>
+          <div style={{ margin: `${sliderSizing.blockSpacing || '20px'} 0` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ fontWeight: 600, fontSize: sliderSizing.labelFontSize || '16px', color: '#0f172a' }}>{props.label}</span>
               <span style={{ color: '#4d4f54', fontSize: sliderSizing.valueFontSize || '15px' }}>
                 {currentValue}
                 {unitSuffix}
@@ -625,6 +790,10 @@ function App() {
                 height: sliderSizing.trackHeight || '30px',
                 accentColor: primaryColor,
                 cursor: 'pointer',
+                background: trackFill,
+                borderRadius: '999px',
+                border: `1px solid ${rgbaFromHex(primaryColor, 0.22)}`,
+                boxShadow: 'inset 0 1px 3px rgba(15, 23, 42, 0.15)',
               }}
             />
             <div
@@ -633,11 +802,17 @@ function App() {
                 justifyContent: 'space-between',
                 fontSize: sliderSizing.markerFontSize || '13px',
                 color: '#6c6f75',
-                marginTop: '4px',
+                marginTop: '6px',
               }}
             >
-              <span>{min}{unitSuffix}</span>
-              <span>{max}{unitSuffix}</span>
+              <span>
+                {min}
+                {unitSuffix}
+              </span>
+              <span>
+                {max}
+                {unitSuffix}
+              </span>
             </div>
           </div>
         );
@@ -650,8 +825,8 @@ function App() {
           Object.prototype.hasOwnProperty.call(controlValues, key) ? controlValues[key] : defaultValue;
 
         return (
-          <label style={{ display: 'block', margin: '14px 0' }}>
-            <span style={{ display: 'block', marginBottom: '6px', fontWeight: 600 }}>{props.label}</span>
+          <label style={{ display: 'block', margin: '18px 0' }}>
+            <span style={{ display: 'block', marginBottom: '8px', fontWeight: 600, color: '#0f172a' }}>{props.label}</span>
             <select
               value={currentValue}
               onChange={(event) => {
@@ -668,10 +843,14 @@ function App() {
               }}
               style={{
                 width: '100%',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                border: `1px solid ${rgbaFromHex(primaryColor, 0.45)}`,
-                background: '#ffffff',
+                padding: '12px 16px',
+                borderRadius: '14px',
+                border: `1px solid ${subtleBorder}`,
+                background: `linear-gradient(140deg, rgba(255, 255, 255, 0.95), ${rgbaFromHex(primaryColor, 0.06)})`,
+                boxShadow: '0 12px 28px rgba(15, 23, 42, 0.09)',
+                fontSize: '15px',
+                fontWeight: 500,
+                color: '#1f2933',
               }}
             >
               {props.placeholder && (
@@ -691,10 +870,13 @@ function App() {
       case 'statusCard': {
         const tone = props.tone || 'info';
         const palette = {
-          info: { background: rgbaFromHex(primaryColor, 0.12), text: primaryColor },
-          success: { background: '#E6F4EA', text: '#0B8A37' },
-          warning: { background: '#FFF4E5', text: '#B45309' },
-          danger: { background: '#FEECEC', text: '#C62828' },
+          info: {
+            background: `linear-gradient(145deg, ${rgbaFromHex(primaryColor, 0.16)}, rgba(255, 255, 255, 0.9))`,
+            text: accentShadow,
+          },
+          success: { background: 'linear-gradient(145deg, #d1fae5, #ffffff)', text: '#15803d' },
+          warning: { background: 'linear-gradient(145deg, #fff7ed, #ffffff)', text: '#b45309' },
+          danger: { background: 'linear-gradient(145deg, #fee2e2, #ffffff)', text: '#b91c1c' },
         };
         const resolved = palette[tone] || palette.info;
         const items = Array.isArray(props.items) ? props.items : [];
@@ -703,29 +885,46 @@ function App() {
           <div
             style={{
               background: resolved.background,
-              borderRadius: '16px',
-              padding: '16px',
+              borderRadius: '20px',
+              padding: '20px',
               margin: '14px 0',
               color: resolved.text,
+              border: `1px solid ${rgbaFromHex(primaryColor, 0.1)}`,
+              boxShadow: '0 20px 36px rgba(15, 23, 42, 0.08)',
+              position: 'relative',
+              overflow: 'hidden',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              {props.icon && <span style={{ fontSize: '18px' }}>{props.icon}</span>}
-              <span style={{ fontWeight: 600, color: '#2f3238' }}>{props.title}</span>
+            <span
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                inset: 'auto -20% -60% auto',
+                width: '180px',
+                height: '180px',
+                background: rgbaFromHex(primaryColor, 0.12),
+                filter: 'blur(60px)',
+                borderRadius: '50%',
+                pointerEvents: 'none',
+              }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+              {props.icon && <span style={{ fontSize: '20px' }}>{props.icon}</span>}
+              <span style={{ fontWeight: 700, color: '#111827' }}>{props.title}</span>
             </div>
             {props.value && (
-              <div style={{ fontSize: '28px', fontWeight: 700, color: resolved.text }}>{props.value}</div>
+              <div style={{ fontSize: '32px', fontWeight: 800, color: resolved.text }}>{props.value}</div>
             )}
             {items.length > 0 && (
-              <div style={{ marginTop: '12px', display: 'grid', gap: '6px' }}>
+              <div style={{ marginTop: '16px', display: 'grid', gap: '8px' }}>
                 {items.map((item, index) => (
                   <div
                     key={`${item.label}-${index}`}
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
-                      color: '#2f3238',
-                      fontSize: '14px',
+                      color: '#1f2937',
+                      fontSize: '15px',
                     }}
                   >
                     <span>{item.label}</span>
@@ -744,41 +943,39 @@ function App() {
 
   return (
     <div
+      className="app-shell"
       style={{
-        fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        backgroundColor: '#f4f5f7',
-        minHeight: '100vh',
+        '--primary-color': primaryColor,
+        '--primary-contrast': primaryContrast,
       }}
     >
-      <div style={{ maxWidth: '420px', margin: '0 auto', padding: '24px 20px' }}>
-        <header style={{ marginBottom: '16px' }}>
-          <h1 style={{ margin: 0, color: primaryColor }}>End Device</h1>
-          <div style={{ marginTop: '6px', color: '#4d4f54' }}>Listening for UI updates…</div>
-          {lastUpdate && (
-            <div style={{ marginTop: '4px', color: '#6c6f75', fontSize: '14px' }}>
-              Last update: {new Date(lastUpdate).toLocaleTimeString()}
+      <div className="ui-wrapper">
+        <div className="ui-card">
+          <header className="ui-header">
+            <h1 className="ui-heading">Smartphone Controller</h1>
+            <div className="ui-subheading">Listening for UI updates…</div>
+            {lastUpdate && (
+              <div className="last-update">Last update: {new Date(lastUpdate).toLocaleTimeString()}</div>
+            )}
+            <div className="ergonomics-label">
+              Ergonomics profile: <strong>{ergonomicsProfile}</strong>
             </div>
-          )}
-          <div style={{ marginTop: '4px', color: '#6c6f75', fontSize: '14px' }}>
-            Ergonomics profile: <strong>{ergonomicsProfile}</strong>
-          </div>
-          {actionState.status && (
-            <div
-              style={{
-                marginTop: '12px',
-                padding: '8px 12px',
-                borderRadius: '10px',
-                fontSize: '14px',
-                fontWeight: 500,
-                background: actionStatusStyles[actionState.status]?.background,
-                color: actionStatusStyles[actionState.status]?.color,
-              }}
-            >
-              {actionState.message}
-            </div>
-          )}
-        </header>
-        {renderUi(ui)}
+            {actionState.status && (
+              <div
+                className="status-pill"
+                style={{
+                  background: actionStatusStyles[actionState.status]?.background,
+                  color: actionStatusStyles[actionState.status]?.color,
+                }}
+              >
+                {actionState.message}
+              </div>
+            )}
+          </header>
+          <section className="ui-body">
+            {ui ? renderUi(ui) : <div className="empty-state">Waiting for the core system to send a layout…</div>}
+          </section>
+        </div>
       </div>
     </div>
   );
