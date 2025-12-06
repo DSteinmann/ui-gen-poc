@@ -4,13 +4,15 @@
     "text": {
       "props": {
         "text": "string",
-        "variant": "string"
+        "variant": "string",
+        "size": "string"
       }
     },
     "button": {
       "props": {
         "label": "string",
         "style": "string",
+        "size": "string",
         "action": "object"
       }
     },
@@ -18,6 +20,7 @@
       "props": {
         "label": "string",
         "checked": "boolean",
+        "size": "string",
         "action": "object"
       }
     },
@@ -29,6 +32,7 @@
         "step": "number",
         "value": "number",
         "unit": "string",
+        "size": "string",
         "action": "object"
       }
     },
@@ -38,6 +42,7 @@
         "placeholder": "string",
         "options": "array",
         "value": "string",
+        "size": "string",
         "action": "object"
       }
     },
@@ -63,7 +68,20 @@
     "defaultPrimaryColor": "#1f6feb"
   },
   "context": {
-    "modalityPreference": "visual-first"
+    "modalityPreference": "visual-first",
+    "defaultErgonomicsProfile": "standard",
+    "supportedErgonomicsProfiles": [
+      {
+        "id": "standard",
+        "label": "Standard handset",
+        "description": "Compact tap targets suitable for close-range interaction."
+      },
+      {
+        "id": "large-tap-targets",
+        "label": "Large tap targets",
+        "description": "Increases padding and font sizes for use while walking or wearing gloves."
+      }
+    ]
   },
   "responseSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -142,6 +160,7 @@
           "type": { "const": "text" },
           "text": { "type": "string" },
           "variant": { "type": "string" },
+          "size": { "type": "string", "description": "Optional typography size hint (e.g., 'large')." },
           "tone": { "type": "string" },
           "thingId": {
             "type": "string",
@@ -158,6 +177,7 @@
           "label": { "type": "string" },
           "icon": { "type": "string" },
           "style": { "type": "string" },
+          "size": { "type": "string", "description": "Visual density hint (standard, compact, large)." },
           "thingId": {
             "type": "string",
             "description": "Thing identifier to target when executing the bound action."
@@ -179,6 +199,7 @@
           "type": { "const": "toggle" },
           "label": { "type": "string" },
           "checked": { "type": "boolean" },
+          "size": { "type": "string" },
           "thingId": {
             "type": "string",
             "description": "Thing identifier to target when toggling."
@@ -203,6 +224,7 @@
           "step": { "type": "number", "default": 1 },
           "value": { "type": "number" },
           "unit": { "type": "string" },
+          "size": { "type": "string" },
           "thingId": {
             "type": "string",
             "description": "Thing identifier to target when sending slider updates."
@@ -224,6 +246,7 @@
           "label": { "type": "string" },
           "placeholder": { "type": "string" },
           "value": { "type": "string" },
+          "size": { "type": "string" },
           "thingId": {
             "type": "string",
             "description": "Thing identifier to target when selection changes."

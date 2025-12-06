@@ -129,6 +129,161 @@ const rgbaFromHex = (hexColor, alpha = 0.15) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
+const normalizeToken = (value) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim().toLowerCase();
+  return trimmed.length ? trimmed : null;
+};
+
+const LARGE_PROFILE_ALIASES = new Set([
+  'large',
+  'large-tap-targets',
+  'large tap targets',
+  'large_tap_targets',
+  'glove-mode',
+  'spacious',
+]);
+
+const COMPACT_PROFILE_ALIASES = new Set([
+  'compact',
+  'dense',
+  'one-handed',
+  'one handed',
+  'compact-mode',
+]);
+
+const componentSizePresets = {
+  text: {
+    compact: { fontSize: '13px', lineHeight: 1.35, margin: '4px 0' },
+    standard: { fontSize: '16px', lineHeight: 1.5, margin: '8px 0' },
+    large: { fontSize: '22px', lineHeight: 1.65, margin: '14px 0' },
+  },
+  button: {
+    compact: { padding: '8px 12px', fontSize: '14px', borderRadius: '8px', minHeight: '38px' },
+    standard: { padding: '12px 18px', fontSize: '16px', borderRadius: '10px', minHeight: '48px' },
+    large: { padding: '20px 26px', fontSize: '20px', borderRadius: '14px', minHeight: '64px' },
+  },
+  toggle: {
+    compact: { labelFontSize: '14px', controlSize: '16px', gap: '6px', paddingY: '4px' },
+    standard: { labelFontSize: '16px', controlSize: '20px', gap: '10px', paddingY: '8px' },
+    large: { labelFontSize: '20px', controlSize: '28px', gap: '14px', paddingY: '12px' },
+  },
+  slider: {
+    compact: {
+      blockSpacing: '10px',
+      labelFontSize: '14px',
+      valueFontSize: '13px',
+      markerFontSize: '11px',
+      trackHeight: '22px',
+    },
+    standard: {
+      blockSpacing: '16px',
+      labelFontSize: '16px',
+      valueFontSize: '15px',
+      markerFontSize: '13px',
+      trackHeight: '30px',
+    },
+    large: {
+      blockSpacing: '26px',
+      labelFontSize: '20px',
+      valueFontSize: '19px',
+      markerFontSize: '16px',
+      trackHeight: '44px',
+    },
+  },
+  dropdown: {
+    compact: {
+      blockSpacing: '8px',
+      labelFontSize: '14px',
+      controlFontSize: '14px',
+      padding: '8px 12px',
+      minHeight: '36px',
+      labelGap: '4px',
+    },
+    standard: {
+      blockSpacing: '14px',
+      labelFontSize: '16px',
+      controlFontSize: '16px',
+      padding: '12px 16px',
+      minHeight: '48px',
+      labelGap: '6px',
+    },
+    large: {
+      blockSpacing: '24px',
+      labelFontSize: '20px',
+      controlFontSize: '20px',
+      padding: '20px 22px',
+      minHeight: '64px',
+      labelGap: '10px',
+    },
+  },
+};
+
+const resolveErgonomicsProfile = (context = {}) => {
+  const candidate =
+    context.ergonomicsProfile
+    || context?.ergonomics?.profile
+    || context?.ergonomicsMode
+    || context?.ergonomicsPreset
+    || context?.defaultErgonomicsProfile;
+
+  return 'compact';
+};
+
+const normalizeSizeToken = (size) => {
+  const token = normalizeToken(size);
+  if (!token || token === 'auto') {
+    return null;
+  }
+
+  if (token === 'comfortable' || token === 'spacious') {
+    return 'large';
+  }
+
+  if (token === 'dense' || token === 'condensed') {
+    return 'compact';
+  }
+
+  if (token === 'default') {
+    return 'standard';
+  }
+
+  if (['compact', 'standard', 'large'].includes(token)) {
+    return token;
+  }
+
+  return null;
+};
+
+const resolveComponentSize = (requestedSize, ergonomicsProfile) => {
+  const explicitSize = normalizeSizeToken(requestedSize);
+  if (explicitSize) {
+    return explicitSize;
+  }
+
+  if (LARGE_PROFILE_ALIASES.has(ergonomicsProfile)) {
+    return 'large';
+  }
+
+  if (COMPACT_PROFILE_ALIASES.has(ergonomicsProfile)) {
+    return 'compact';
+  }
+
+  return 'standard';
+};
+
+const getSizingForComponent = (component, sizeToken) => {
+  const preset = componentSizePresets[component];
+  if (!preset) {
+    return {};
+  }
+
+  return preset[sizeToken] || preset.standard || {};
+};
+
 const deriveThingIdFromAction = (action) => {
   if (!action || typeof action !== 'object') {
     return null;
@@ -190,6 +345,7 @@ function App() {
     [theme.primaryColor]
   );
   const primaryContrast = useMemo(() => getContrastColor(primaryColor), [primaryColor]);
+  const ergonomicsProfile = useMemo(() => resolveErgonomicsProfile(ui?.context || {}), [ui]);
 
   useEffect(() => {
     if (!actionState.status || actionState.status === 'pending') {
@@ -314,26 +470,54 @@ function App() {
           </div>
         );
       case 'text':
-        return <p style={{ margin: '8px 0', fontSize: '16px' }}>{props.content || props.text}</p>;
+        {
+          const sizeToken = resolveComponentSize(props.size, ergonomicsProfile);
+          const textSizing = getSizingForComponent('text', sizeToken);
+          return (
+            <p
+              style={{
+                margin: textSizing.margin || '8px 0',
+                fontSize: textSizing.fontSize || '16px',
+                lineHeight: textSizing.lineHeight || 1.5,
+              }}
+            >
+              {props.content || props.text}
+            </p>
+          );
+        }
       case 'button':
-        return (
-          <button
-            style={{
-              backgroundColor: primaryColor,
-              color: primaryContrast,
-              border: `1px solid ${primaryColor}`,
-              borderRadius: '8px',
-              padding: '12px 16px',
-              fontSize: '16px',
-              fontWeight: '600',
-              cursor: props.action ? 'pointer' : 'default',
-              margin: '6px 0',
-            }}
-            onClick={props.action ? () => executeAction(props.action, { component: 'button', label: props.label || props.content || props.text, thingId: props.action?.thingId }) : null}
-          >
-            {props.label || props.content || props.text}
-          </button>
-        );
+        {
+          const sizeToken = resolveComponentSize(props.size, ergonomicsProfile);
+          const buttonSizing = getSizingForComponent('button', sizeToken);
+          return (
+            <button
+              style={{
+                backgroundColor: primaryColor,
+                color: primaryContrast,
+                border: `1px solid ${primaryColor}`,
+                borderRadius: buttonSizing.borderRadius || '10px',
+                padding: buttonSizing.padding || '12px 16px',
+                fontSize: buttonSizing.fontSize || '16px',
+                fontWeight: 600,
+                cursor: props.action ? 'pointer' : 'default',
+                margin: '6px 0',
+                minHeight: buttonSizing.minHeight || '48px',
+              }}
+              onClick={
+                props.action
+                  ? () =>
+                      executeAction(props.action, {
+                        component: 'button',
+                        label: props.label || props.content || props.text,
+                        thingId: props.action?.thingId,
+                      })
+                  : null
+              }
+            >
+              {props.label || props.content || props.text}
+            </button>
+          );
+        }
       case 'input':
         return (
           <input
@@ -348,14 +532,17 @@ function App() {
             }}
           />
         );
-      case 'toggle':
+      case 'toggle': {
+        const sizeToken = resolveComponentSize(props.size, ergonomicsProfile);
+        const toggleSizing = getSizingForComponent('toggle', sizeToken);
         return (
           <label
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '10px',
-              padding: '8px 0',
+              gap: toggleSizing.gap || '10px',
+              padding: `${toggleSizing.paddingY || '8px'} 0`,
+              fontSize: toggleSizing.labelFontSize || '16px',
             }}
           >
             <input
@@ -366,11 +553,16 @@ function App() {
                 const nextValue = event.target.checked;
                 executeAction(props.action, { component: 'toggle', label: props.label, value: nextValue, thingId: props.action?.thingId });
               }}
-              style={{ accentColor: primaryColor, width: '18px', height: '18px' }}
+              style={{
+                accentColor: primaryColor,
+                width: toggleSizing.controlSize || '20px',
+                height: toggleSizing.controlSize || '20px',
+              }}
             />
-            {props.label}
+            <span>{props.label}</span>
           </label>
         );
+      }
       case 'slider': {
         const key = resolveControlKey('slider', props);
         const min = typeof props.min === 'number' ? props.min : 0;
@@ -381,6 +573,8 @@ function App() {
           Object.prototype.hasOwnProperty.call(controlValues, key) ? controlValues[key] : defaultValue;
         const unitSuffix = props.unit ? ` ${props.unit}` : '';
         const sendMode = props.trigger === 'change' ? 'change' : 'commit';
+        const sizeToken = resolveComponentSize(props.size, ergonomicsProfile);
+        const sliderSizing = getSizingForComponent('slider', sizeToken);
         const commitValue = (value) => {
           if (!props.action) {
             return;
@@ -395,10 +589,10 @@ function App() {
         };
 
         return (
-          <div style={{ margin: '16px 0' }}>
+          <div style={{ margin: `${sliderSizing.blockSpacing || '16px'} 0` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <span style={{ fontWeight: 600 }}>{props.label}</span>
-              <span style={{ color: '#4d4f54' }}>
+              <span style={{ fontWeight: 600, fontSize: sliderSizing.labelFontSize || '16px' }}>{props.label}</span>
+              <span style={{ color: '#4d4f54', fontSize: sliderSizing.valueFontSize || '15px' }}>
                 {currentValue}
                 {unitSuffix}
               </span>
@@ -426,13 +620,18 @@ function App() {
                   commitValue(Number(event.target.value));
                 }
               }}
-              style={{ width: '100%' }}
+              style={{
+                width: '100%',
+                height: sliderSizing.trackHeight || '30px',
+                accentColor: primaryColor,
+                cursor: 'pointer',
+              }}
             />
             <div
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
-                fontSize: '13px',
+                fontSize: sliderSizing.markerFontSize || '13px',
                 color: '#6c6f75',
                 marginTop: '4px',
               }}
@@ -560,6 +759,9 @@ function App() {
               Last update: {new Date(lastUpdate).toLocaleTimeString()}
             </div>
           )}
+          <div style={{ marginTop: '4px', color: '#6c6f75', fontSize: '14px' }}>
+            Ergonomics profile: <strong>{ergonomicsProfile}</strong>
+          </div>
           {actionState.status && (
             <div
               style={{

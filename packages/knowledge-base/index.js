@@ -73,6 +73,12 @@ const DATA_FILE = process.env.KNOWLEDGE_BASE_DATA_FILE
   ? path.resolve(process.env.KNOWLEDGE_BASE_DATA_FILE)
   : path.join(__dirname, 'kb-data.json');
 
+const LLM_LOG_DIR = process.env.KB_LLM_LOG_DIR
+  ? path.resolve(process.env.KB_LLM_LOG_DIR)
+  : path.join(__dirname, 'logs');
+const LLM_LOG_FILE = path.join(LLM_LOG_DIR, 'llm-transcripts.log');
+const LLM_STATS_FILE = path.join(LLM_LOG_DIR, 'llm-stats.json');
+
 const nowIsoString = () => new Date().toISOString();
 
 const ensureDataFile = () => {
@@ -82,6 +88,85 @@ const ensureDataFile = () => {
   }
   if (!fs.existsSync(DATA_FILE)) {
     fs.writeFileSync(DATA_FILE, JSON.stringify({ documents: [] }, null, 2), 'utf-8');
+  }
+};
+
+const ensureLogDirectory = () => {
+  if (!fs.existsSync(LLM_LOG_DIR)) {
+    fs.mkdirSync(LLM_LOG_DIR, { recursive: true });
+  }
+};
+
+const appendLlmTranscript = (entry) => {
+  try {
+    ensureLogDirectory();
+    fs.appendFileSync(LLM_LOG_FILE, `${JSON.stringify(entry)}\n`, 'utf-8');
+  } catch (error) {
+    console.error('[KB] Failed to append LLM transcript:', error.message);
+  }
+};
+
+const llmStats = {
+  totalCalls: 0,
+  totalDurationMs: 0,
+  totalTokens: 0,
+  providers: {},
+  models: {},
+  lastUpdated: null,
+};
+
+const persistLlmStats = () => {
+  try {
+    ensureLogDirectory();
+    fs.writeFileSync(LLM_STATS_FILE, JSON.stringify(llmStats, null, 2), 'utf-8');
+  } catch (error) {
+    console.error('[KB] Failed to persist LLM stats:', error.message);
+  }
+};
+
+const recordLlmStats = ({ provider, model, durationMs, tokens }) => {
+  llmStats.totalCalls += 1;
+  llmStats.totalDurationMs += durationMs;
+  if (typeof tokens === 'number' && Number.isFinite(tokens)) {
+    llmStats.totalTokens += tokens;
+  }
+
+  if (provider) {
+    llmStats.providers[provider] = llmStats.providers[provider] || { calls: 0, durationMs: 0 };
+    llmStats.providers[provider].calls += 1;
+    llmStats.providers[provider].durationMs += durationMs;
+  }
+
+  if (model) {
+    llmStats.models[model] = llmStats.models[model] || { calls: 0, tokens: 0, durationMs: 0 };
+    llmStats.models[model].calls += 1;
+    llmStats.models[model].durationMs += durationMs;
+    if (typeof tokens === 'number' && Number.isFinite(tokens)) {
+      llmStats.models[model].tokens += tokens;
+    }
+  }
+
+  llmStats.lastUpdated = nowIsoString();
+  persistLlmStats();
+};
+
+const logLlmInteraction = ({ contextLabel, provider, model, requestPayload, responsePayload, durationMs, error }) => {
+  const entry = {
+    timestamp: nowIsoString(),
+    contextLabel,
+    provider,
+    model,
+    durationMs,
+    error: error ? error.message || String(error) : null,
+    request: requestPayload,
+    response: responsePayload,
+  };
+
+  appendLlmTranscript(entry);
+
+  if (!error) {
+    const tokens = responsePayload?.usage?.total_tokens || null;
+    recordLlmStats({ provider, model, durationMs, tokens });
   }
 };
 
@@ -150,6 +235,38 @@ const loadDocuments = () => {
 
 const persistDocuments = (docs) => {
   fs.writeFileSync(DATA_FILE, JSON.stringify({ documents: docs }, null, 2), 'utf-8');
+};
+
+const normalizeScalarToken = (value) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const token = value.trim().toLowerCase();
+  return token.length ? token : null;
+};
+
+const LARGE_TAP_TARGET_PROFILE = 'large-tap-targets';
+const LARGE_TAP_ALIASES = new Set([
+  LARGE_TAP_TARGET_PROFILE,
+  'large tap targets',
+  'glove-mode',
+  'glove mode',
+  'running-friendly',
+  'running friendly',
+]);
+
+const resolveErgonomicsProfile = (value) => {
+  const token = normalizeScalarToken(value);
+  if (!token) {
+    return null;
+  }
+
+  if (LARGE_TAP_ALIASES.has(token)) {
+    return LARGE_TAP_TARGET_PROFILE;
+  }
+
+  return token;
 };
 
 // Unified entry point for both OpenRouter and a local LLM endpoint; falls back automatically if one fails.
@@ -222,10 +339,30 @@ const invokeChatCompletion = async (requestBody, { contextLabel = 'llm-request' 
   };
 
   if (openRouterApiKey) {
+    const openRouterStart = Date.now();
     try {
       const data = await callOpenRouter();
+      const durationMs = Date.now() - openRouterStart;
+      logLlmInteraction({
+        contextLabel,
+        provider: 'openrouter',
+        model: basePayload.model,
+        requestPayload: basePayload,
+        responsePayload: data,
+        durationMs,
+      });
       return { data, provider: 'openrouter', model: basePayload.model };
     } catch (error) {
+      const durationMs = Date.now() - openRouterStart;
+      logLlmInteraction({
+        contextLabel,
+        provider: 'openrouter',
+        model: basePayload.model,
+        requestPayload: basePayload,
+        responsePayload: null,
+        durationMs,
+        error,
+      });
       console.error(`[KB] OpenRouter request failed for ${contextLabel}:`, error.message);
       if (!llmEndpoint) {
         throw error;
@@ -237,8 +374,33 @@ const invokeChatCompletion = async (requestBody, { contextLabel = 'llm-request' 
     throw new Error('No LLM endpoint available. Configure OPENROUTER_API_KEY or LLM_ENDPOINT.');
   }
 
-  const data = await callLocalEndpoint();
-  return { data, provider: 'local', model: basePayload.model };
+  const localStart = Date.now();
+  try {
+    const data = await callLocalEndpoint();
+    const durationMs = Date.now() - localStart;
+    logLlmInteraction({
+      contextLabel,
+      provider: 'local',
+      model: basePayload.model,
+      requestPayload: basePayload,
+      responsePayload: data,
+      durationMs,
+    });
+    return { data, provider: 'local', model: basePayload.model };
+  } catch (error) {
+    const durationMs = Date.now() - localStart;
+    logLlmInteraction({
+      contextLabel,
+      provider: 'local',
+      model: basePayload.model,
+      requestPayload: basePayload,
+      responsePayload: null,
+      durationMs,
+      error,
+    });
+    console.error(`[KB] Local LLM endpoint failed for ${contextLabel}:`, error.message);
+    throw error;
+  }
 };
 
 const documents = loadDocuments();
@@ -266,6 +428,7 @@ const addDocument = ({ id, content, metadata = {}, tags = [] }) => {
       documents.find((doc) => doc.id === docId)?.createdAt || nowIsoString(),
   };
 
+  documents.push(record);
   persistDocuments(documents);
   return record;
 };
@@ -284,7 +447,7 @@ const seedDocuments = [
   {
     id: 'user-preference-primary-color',
     content:
-      'The primary household preference for interface accents is the color "#1F6FEB" (a vivid cobalt). Whenever possible, set the UI theme primary color to this value so buttons, toggles, and other interactive highlights align with the user preference. Ensure sufficient contrast by using light text on dark backgrounds.',
+      'The primary household preference for interface accents is the color "#808080" (a grey). Whenever possible, set the UI theme primary color to this value so buttons, toggles, and other interactive highlights align with the user preference. Ensure sufficient contrast by using light text on dark backgrounds.',
     metadata: {
       source: 'user-profile',
       version: '2025.10',
@@ -303,6 +466,57 @@ const seedKnowledgeBase = () => {
 };
 
 seedKnowledgeBase();
+
+const PREFERENCE_TAG_KEYWORDS = ['preference', 'preferences', 'user-preference', 'user-preferences', 'personalization'];
+
+const matchesPreferenceTag = (tag) => {
+  if (typeof tag !== 'string') {
+    return false;
+  }
+  const normalized = tag.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  return PREFERENCE_TAG_KEYWORDS.some((keyword) => normalized === keyword || normalized.includes(keyword));
+};
+
+const isPreferenceMetadataValue = (value) => {
+  const token = normalizeScalarToken(value);
+  if (!token) {
+    return false;
+  }
+  return token.includes('preference') || token.includes('profile');
+};
+
+const isUserPreferenceDocument = (doc) => {
+  if (!doc || typeof doc !== 'object') {
+    return false;
+  }
+
+  const hasPreferenceTag = Array.isArray(doc.tags) && doc.tags.some(matchesPreferenceTag);
+  const metadata = doc.metadata || {};
+  const hasPreferenceMetadata = isPreferenceMetadataValue(metadata.source)
+    || isPreferenceMetadataValue(metadata.category)
+    || isPreferenceMetadataValue(metadata.type);
+
+  return hasPreferenceTag || hasPreferenceMetadata;
+};
+
+const getUserPreferenceDocuments = () => documents.filter(isUserPreferenceDocument);
+
+const buildUserPreferenceContext = () => {
+  const preferenceDocuments = getUserPreferenceDocuments().filter((doc) => typeof doc?.content === 'string' && doc.content.trim().length > 0);
+  if (!preferenceDocuments.length) {
+    return null;
+  }
+
+  return preferenceDocuments
+    .map((doc) => {
+      const sourceLabel = doc.metadata?.source || doc.metadata?.category || doc.id || 'user-preference';
+      return `Preference (${sourceLabel}):\n${doc.content.trim()}`;
+    })
+    .join('\n\n');
+};
 
 // Quick-n-dirty TF/IDF scorer that pulls requirement snippets relevant to the current prompt/context bundle.
 const retrieveRelevantDocuments = ({ prompt, thingDescription, capabilityData, capabilities, missingCapabilities, device, uiContext, thingActions, availableThings }) => {
@@ -413,6 +627,7 @@ const runDeviceSelection = async ({
     const knowledgeContext = retrievedDocuments.length
       ? retrievedDocuments.map((doc, index) => `Doc ${index + 1} (score ${doc.score.toFixed(3)}): ${doc.content}`).join('\n\n')
       : null;
+    const preferenceContext = buildUserPreferenceContext();
 
     const selectionMessages = [
       {
@@ -429,6 +644,13 @@ const runDeviceSelection = async ({
       selectionMessages.push({
         role: 'system',
         content: `Supporting requirement documents:\n${knowledgeContext}`,
+      });
+    }
+
+    if (preferenceContext) {
+      selectionMessages.push({
+        role: 'system',
+        content: `Persistent household preferences:\n${preferenceContext}`,
       });
     }
 
@@ -526,6 +748,8 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
     console.log('Retrieved documents for context:', retrievedDocuments.map((doc) => `${doc.id} (score ${doc.score.toFixed(3)})`));
   }
 
+  const preferenceContext = buildUserPreferenceContext();
+
   const allowedActionIds = Array.isArray(thingActions)
     ? thingActions.map((action) => action && action.id).filter(Boolean)
     : [];
@@ -590,30 +814,64 @@ async function runAgent({ prompt, thingDescription, capabilities = [], uiSchema 
     });
   }
 
+  if (preferenceContext) {
+    messages.push({
+      role: 'system',
+      content: `The household profile includes persistent user preferences. Apply them whenever compatible with the task:\n\n${preferenceContext}`,
+    });
+  }
+
   const activityDetails = capabilityData?.userActivity || {};
   const activitySample = activityDetails.data || activityDetails.cachedSample || null;
   const activityState = activitySample?.id || activitySample?.state || null;
   const selectionHint = selection?.reason ? selection.reason.toLowerCase() : '';
   const selectionContext = selection?.raw ? JSON.stringify(selection.raw).toLowerCase() : '';
+  const activityErgonomicsProfile = resolveErgonomicsProfile(
+    activitySample?.ergonomicsProfile
+    || activityDetails.preferredErgonomicsProfile
+    || (activityState === 'running' ? LARGE_TAP_TARGET_PROFILE : null),
+  );
 
-    const impliesHandsFree = selectionHint.includes('hands-free')
-      || selectionHint.includes('touch')
-      || selectionContext.includes('hands-free')
-      || selectionContext.includes('touch');
+  const impliesHandsFree = selectionHint.includes('hands-free')
+    || selectionHint.includes('touch')
+    || selectionContext.includes('hands-free')
+    || selectionContext.includes('touch');
 
-    if (impliesHandsFree || activityState === 'hands-free') {
-      messages.push({
-        role: 'system',
-        content: 'Current context indicates the user is hands-free. Avoid presenting warnings about hands being occupied or forcing voice interactions. Provide touch-friendly controls and only mention voice input as an optional enhancement.',
-      });
-    }
+  const preferLargeTapTargets = activityErgonomicsProfile === LARGE_TAP_TARGET_PROFILE
+    || activityState === 'running';
 
-    if (activityState === 'hands-occupied') {
-      messages.push({
-        role: 'system',
-        content: 'Current activity is hands-occupied. Offer voice-first guidance and minimize the need for touch input.',
-      });
-    }
+  if (impliesHandsFree || activityState === 'hands-free') {
+    messages.push({
+      role: 'system',
+      content: 'Current context indicates the user is hands-free. Avoid presenting warnings about hands being occupied or forcing voice interactions. Provide touch-friendly controls and only mention voice input as an optional enhancement.',
+    });
+  }
+
+  if (activityState === 'hands-occupied') {
+    messages.push({
+      role: 'system',
+      content: 'Current activity is hands-occupied. Offer voice-first guidance and minimize the need for touch input.',
+    });
+  }
+
+  if (activityState === 'running') {
+    messages.push({
+      role: 'system',
+      content: 'Current activity is running. Keep the UI glanceable, limit the number of required taps, and avoid dense layouts that demand precision.',
+    });
+  }
+
+  if (preferLargeTapTargets) {
+    messages.push({
+      role: 'system',
+      content: 'Set `context.defaultErgonomicsProfile` to "large-tap-targets" and prefer `size: "large"` for tactile controls (buttons, toggles, sliders, dropdowns) unless a requirement explicitly calls for compact layouts.',
+    });
+  } else {
+    messages.push({
+      role: 'system',
+      content: 'Unless requirements explicitly demand larger targets, leave `context.defaultErgonomicsProfile` at "standard" and size controls normally.',
+    });
+  }
   if (uiSchema.theming?.supportsPrimaryColor) {
     messages.push({
       role: 'system',
@@ -928,6 +1186,16 @@ Reference the action id in generated components so downstream services can invok
       uiDefinition = parsedContent;
     }
     break;
+  }
+
+  if (preferLargeTapTargets && uiDefinition && typeof uiDefinition === 'object' && !Array.isArray(uiDefinition)) {
+    if (!uiDefinition.context || typeof uiDefinition.context !== 'object' || Array.isArray(uiDefinition.context)) {
+      uiDefinition.context = {};
+    }
+
+    if (!uiDefinition.context.defaultErgonomicsProfile) {
+      uiDefinition.context.defaultErgonomicsProfile = LARGE_TAP_TARGET_PROFILE;
+    }
   }
 
   return uiDefinition;

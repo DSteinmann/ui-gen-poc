@@ -51,6 +51,11 @@ const activityStates = [
     id: 'hands-occupied',
     description: 'User hands are busy; defer to audio or voice interaction',
   },
+  {
+    id: 'running',
+    description: 'User is running; prioritize short interactions and large tap targets',
+    ergonomicsProfile: 'large-tap-targets',
+  },
 ];
 
 let currentActivityIndex = 0;

@@ -50,6 +50,7 @@ services:
       start_period: 10s
     volumes:
       - knowledge-base-data:/data
+      - ./packages/knowledge-base/logs:/app/packages/knowledge-base/logs
     depends_on:
       core-system:
         condition: service_healthy
