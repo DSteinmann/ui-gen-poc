@@ -270,9 +270,23 @@ const resolveErgonomicsProfile = (context = {}) => {
     || context?.ergonomics?.profile
     || context?.ergonomicsMode
     || context?.ergonomicsPreset
-    || context?.defaultErgonomicsProfile;
+    || context?.defaultErgonomicsProfile
+    || context?.profile;
 
-  return 'compact';
+  const token = normalizeToken(candidate);
+  if (!token) {
+    return 'standard';
+  }
+
+  if (LARGE_PROFILE_ALIASES.has(token)) {
+    return 'large-tap-targets';
+  }
+
+  if (COMPACT_PROFILE_ALIASES.has(token)) {
+    return 'compact';
+  }
+
+  return token;
 };
 
 const normalizeSizeToken = (size) => {
