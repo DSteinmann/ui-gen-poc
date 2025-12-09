@@ -16,6 +16,7 @@
 - Normalized ergonomics profiles via `resolveErgonomicsProfile`, ensuring compact/standard/cozy layouts follow `ui.context` instead of defaulting to compact.
 - Extended device action execution to include metadata passthrough and console warnings when bindings are absent, simplifying debugging.
 - Captured architectural guidance to broadcast the selected layout to all devices instead of forcing the KB to render every form factor per request.
+- Added a second device (`tablet-device`) with a 12-column grid renderer and schema-level layout hints so the KB can experiment with explicit placement without impacting the smartphone client.
 
 ## Project timeline & progress
 - **Foundational PoC:** Started with a single-device smartphone UI calling hardcoded endpoints. Core/knowledge-base components were stubbed and there was no concept of capabilities, registries, or schema filtering.
@@ -29,6 +30,7 @@
 - **Interactive reliability:** Introduced KB-side action binding inference plus device-level warnings so buttons/toggles always execute actionable descriptors.
 - **Ergonomics & polish:** Device UI received a full visual refresh (glass panels, accent gradients, tuned typography) and its spacing logic now respects context-driven ergonomics.
 - **Multi-device freshness plan:** Decided to broadcast the chosen layout to additional devices after selection instead of regenerating every form factor per KB call, keeping secondary displays up to date without redundant LLM invocations.
+- **Tablet dashboard experiment:** Cloned the device runtime into `tablet-device`, layered a CSS grid renderer, and taught the schema about `layout` objects so we can validate coordinate-driven layouts on a separate surface.
 
 ## Problems encountered & resolutions
 - **LLM inventing actions:** Early prompts caused outputs like `"setPower"`. Added explicit "STRICT REQUIREMENT" instructions, passed concrete action descriptors, and validated action IDs inside the device before dispatching.

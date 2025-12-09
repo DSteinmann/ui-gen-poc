@@ -5,17 +5,17 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const app = express();
-const port = Number.parseInt(process.env.DEVICE_API_PORT || '3002', 10);
+const port = Number.parseInt(process.env.DEVICE_API_PORT || '3012', 10);
 const listenAddress = process.env.BIND_ADDRESS || '0.0.0.0';
 const serviceRegistryUrl = process.env.SERVICE_REGISTRY_URL || 'http://core-system:3000';
 const coreSystemUrl = process.env.CORE_SYSTEM_URL || 'http://core-system:3001';
-const devicePublicUrl = process.env.DEVICE_API_PUBLIC_URL || `http://device-api:${port}`;
+const devicePublicUrl = process.env.DEVICE_API_PUBLIC_URL || `http://tablet-device-api:${port}`;
 const defaultThingBaseUrl = process.env.THING_BASE_URL || null;
 const ACTION_CACHE_TTL_MS = Number.parseInt(process.env.ACTION_CACHE_TTL_MS || '60000', 10);
 
 app.use(express.json());
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5174')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
@@ -35,7 +35,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const deviceId = 'device-smartphone-001';
+const deviceId = 'device-tablet-001';
 const actionCacheByThing = new Map();
 const actionCacheById = new Map();
 const arrayify = (value) => {
@@ -286,7 +286,7 @@ const fetchThingActionsFromCore = async (thingId) => {
     const response = await fetch(`${coreSystemUrl}/things/${encodeURIComponent(thingId)}/actions`);
     if (!response.ok) {
       if (response.status !== 404) {
-        console.warn(`[Device] Failed to fetch actions for thing '${thingId}': ${response.status}`);
+        console.warn(`[Tablet Device] Failed to fetch actions for thing '${thingId}': ${response.status}`);
       }
       return [];
     }
@@ -295,7 +295,7 @@ const fetchThingActionsFromCore = async (thingId) => {
     const actions = Array.isArray(payload?.actions) ? payload.actions : [];
     return rememberThingActions(thingId, actions);
   } catch (error) {
-    console.error(`[Device] Error fetching actions for thing '${thingId}':`, error.message);
+    console.error(`[Tablet Device] Error fetching actions for thing '${thingId}':`, error.message);
     return [];
   }
 };
@@ -331,7 +331,7 @@ const fetchActionByIdFromCore = async (actionId) => {
     }
     return descriptor;
   } catch (error) {
-    console.error(`[Device] Error fetching action '${actionId}' from core:`, error.message);
+    console.error(`[Tablet Device] Error fetching action '${actionId}' from core:`, error.message);
     return null;
   }
 };
@@ -495,7 +495,7 @@ const resolveCandidateBaseUrl = (action = {}, context = {}) => {
 
   if (defaultThingBaseUrl) {
     const actionIdentifier = action.href || action.path || action.service || 'unknown-action';
-    console.debug(`[Device] Using fallback thing base URL '${defaultThingBaseUrl}' for ${actionIdentifier}.`);
+    console.debug(`[Tablet Device] Using fallback thing base URL '${defaultThingBaseUrl}' for ${actionIdentifier}.`);
     return defaultThingBaseUrl;
   }
 
@@ -576,18 +576,18 @@ const registerWithServiceRegistry = async () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: 'smartphone-device',
+        name: 'tablet-device',
         url: devicePublicUrl,
         type: 'device',
         metadata: {
           deviceId,
-          deviceType: 'smartphone',
+          deviceType: 'tablet',
         },
       })
     });
-    console.log('Registered device service with registry');
+    console.log('Registered tablet device service with registry');
   } catch (error) {
-    console.error('Error registering device with service registry:', error);
+    console.error('Error registering tablet device with service registry:', error);
   }
 };
 
@@ -598,15 +598,18 @@ const registerWithCoreSystem = async () => {
 
   const deviceRegistrationPayload = {
     id: deviceId,
-    name: 'Smartphone Controller',
+    name: 'Tablet Dashboard',
     url: devicePublicUrl,
     capabilities: [],
     metadata: {
-      deviceType: 'smartphone',
+      deviceType: 'tablet',
       supportedUiComponents: supportedComponents,
       supportsAudio: false,
       supportsTouch: true,
+      supportsPointer: true,
+      supportsKeyboard: true,
       supportsTheming: supportsTheming,
+      layoutGridColumns: 12,
       uiSchema,
     },
     uiSchema,
@@ -618,9 +621,9 @@ const registerWithCoreSystem = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(deviceRegistrationPayload),
     });
-    console.log('Registered smartphone with core system');
+    console.log('Registered tablet device with core system');
   } catch (error) {
-    console.error('Error registering device with core system:', error);
+    console.error('Error registering tablet device with core system:', error);
   }
 };
 
@@ -726,7 +729,7 @@ const dispatchHttpAction = async (action, context = {}) => {
     body = JSON.stringify({ context, timestamp: nowIsoString() });
   }
 
-  console.log(`[Device] Dispatching HTTP action ${method} ${targetUrl}`);
+  console.log(`[Tablet Device] Dispatching HTTP action ${method} ${targetUrl}`);
   const response = await fetch(targetUrl, { method, headers, body });
   const rawText = await response.text();
   let parsedBody = rawText;
@@ -769,7 +772,7 @@ const performExecutableAction = async (actionPayload, context = {}) => {
   };
 
   if (originalWasString && !hasExecutableHints(resolvedAction)) {
-    console.log(`[Device] Executing simple command: ${actionPayload}`);
+    console.log(`[Tablet Device] Executing simple command: ${actionPayload}`);
     return {
       kind: 'command',
       command: actionPayload,
@@ -810,7 +813,7 @@ const performExecutableAction = async (actionPayload, context = {}) => {
     return { kind: 'http', response: result };
   }
 
-  console.warn('[Device] No executable properties found on action payload:', {
+  console.warn('[Tablet Device] No executable properties found on action payload:', {
     action: resolvedAction,
     originalPayload: actionPayload,
     context: resolvedContext,
@@ -867,7 +870,7 @@ app.post('/api/execute-action', async (req, res) => {
 });
 
 app.listen(port, listenAddress, () => {
-  console.log(`Smartphone device service listening at ${listenAddress}:${port} (public URL: ${devicePublicUrl})`);
+  console.log(`Tablet device service listening at ${listenAddress}:${port} (public URL: ${devicePublicUrl})`);
   registerWithServiceRegistry();
   registerWithCoreSystem();
 });

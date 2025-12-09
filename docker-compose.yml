@@ -85,7 +85,6 @@ services:
       DEVICE_API_PUBLIC_URL: http://device-api:3002
       CORE_SYSTEM_URL: http://core-system:3001
       SERVICE_REGISTRY_URL: http://core-system:3000
-      DEVICE_PRIMARY_THING_ID: thing-light-switch-001
       THING_BASE_URL: http://things:3006/light-switch
       BIND_ADDRESS: 0.0.0.0
     ports:
@@ -117,6 +116,53 @@ services:
         condition: service_healthy
       things:
         condition: service_healthy
+    restart: unless-stopped
+
+  tablet-device-api:
+    build:
+      context: .
+      dockerfile: packages/tablet-device/Dockerfile
+    command: ["npm", "run", "server"]
+    environment:
+      DEVICE_API_PORT: 3012
+      DEVICE_API_PUBLIC_URL: http://tablet-device-api:3012
+      CORE_SYSTEM_URL: http://core-system:3001
+      SERVICE_REGISTRY_URL: http://core-system:3000
+      THING_BASE_URL: http://things:3006/light-switch
+      BIND_ADDRESS: 0.0.0.0
+    ports:
+      - "3012:3012"
+    depends_on:
+      core-system:
+        condition: service_healthy
+      knowledge-base:
+        condition: service_healthy
+      things:
+        condition: service_healthy
+    restart: unless-stopped
+
+  tablet-device-ui:
+    build:
+      context: .
+      dockerfile: packages/tablet-device/Dockerfile
+    environment:
+      VITE_CORE_WS_URL: ws://core-system:3001
+      VITE_CORE_WS_FALLBACK_PORT: 3001
+      VITE_DEVICE_API_URL: http://tablet-device-api:3012
+      VITE_DEVICE_API_PORT: 3012
+      BIND_ADDRESS: 0.0.0.0
+    command: ["npm", "run", "dev"]
+    ports:
+      - "5174:5174"
+    depends_on:
+      core-system:
+        condition: service_healthy
+      knowledge-base:
+        condition: service_healthy
+      things:
+        condition: service_healthy
+      tablet-device-api:
+        condition: service_started
     restart: unless-stopped
 
   things:

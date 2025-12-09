@@ -19,6 +19,7 @@ The stack now consists of cooperating Node services plus web/device front-ends:
 4. **Things service (`packages/things`)** – simulates multiple WoT Things (living room light switch, TractorBot Spock). Each Thing registers with the core so its actions are discoverable.
 5. **Devices** –
    - `packages/device`: smartphone-style controller application plus its device API (`device/src/api.js`).
+   - `packages/tablet-device`: large-format tablet/laptop dashboard with a 12-column grid-aware renderer and matching device API.
    - `packages/voice-device`: audio-first headset simulator.
    These register their supported UI components and receive live UI payloads over WebSocket.
 
@@ -44,6 +45,8 @@ The repository now ships with a Docker Compose workflow that launches all projec
    - Activity recognition service: `http://localhost:3003`
    - Device API service: `http://localhost:3002`
    - Device UI preview (Vite dev server): `http://localhost:5173`
+   - Tablet device API service: `http://localhost:3012`
+   - Tablet device UI preview: `http://localhost:5174`
 
 4. A named Docker volume `knowledge-base-data` persists the knowledge-base `kb-data.json` file across container restarts. To reset the knowledge base, remove the volume: `docker volume rm ui-gen-poc_knowledge-base-data`.
 

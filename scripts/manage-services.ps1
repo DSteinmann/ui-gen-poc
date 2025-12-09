@@ -23,6 +23,8 @@ $Services = @(
     @{ Name = "activity-recognition"; Path = "packages/activity-recognition"; Command = "npm start" }
     @{ Name = "device-api"; Path = "packages/device"; Command = "node server.js" }
     @{ Name = "device-ui"; Path = "packages/device"; Command = "npm run dev" }
+    @{ Name = "tablet-device-api"; Path = "packages/tablet-device"; Command = "node server.js" }
+    @{ Name = "tablet-device-ui"; Path = "packages/tablet-device"; Command = "npm run dev" }
 )
 
 function Get-PidFile($name) {

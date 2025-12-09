@@ -428,7 +428,12 @@ function App() {
     setActionState({ status: 'pending', message: 'Sending action…' });
 
     try {
-      const inferredThingId = metadata.thingId || deriveThingIdFromAction(actionPayload) || ui?.context?.thingId || ui?.thingId || null;
+      const inferredThingId =
+        metadata.thingId
+        || deriveThingIdFromAction(actionPayload)
+        || ui?.context?.thingId
+        || ui?.thingId
+        || null;
       const response = await fetch(`${deviceApiBase}/api/execute-action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

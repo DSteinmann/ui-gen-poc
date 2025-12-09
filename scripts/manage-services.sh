@@ -12,6 +12,8 @@ SERVICES=(
   "activity-recognition:packages/activity-recognition:npm start"
   "device-api:packages/device:node server.js"
   "device-ui:packages/device:npm run dev"
+  "tablet-device-api:packages/tablet-device:node server.js"
+  "tablet-device-ui:packages/tablet-device:npm run dev"
 )
 
 service_ports() {
@@ -21,6 +23,8 @@ service_ports() {
   activity-recognition) echo "3003" ;;
     device-api) echo "3002" ;;
     device-ui) echo "5173" ;;
+    tablet-device-api) echo "3012" ;;
+    tablet-device-ui) echo "5174" ;;
     *) echo "" ;;
   esac
 }

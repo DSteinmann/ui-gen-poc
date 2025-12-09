@@ -126,7 +126,6 @@ const voiceUiSchema = {
   context: {
     modalityPreference: 'audio-first',
     primaryInput: 'voice',
-    primaryThingId: 'thing-light-switch-001',
     supportedThings: [
       {
         thingId: 'thing-light-switch-001',
