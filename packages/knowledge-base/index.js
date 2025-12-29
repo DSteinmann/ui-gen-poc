@@ -5,6 +5,7 @@ import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { Buffer } from 'buffer';
 
 const app = express();
 app.use(express.json());
@@ -80,6 +81,31 @@ const LLM_LOG_FILE = path.join(LLM_LOG_DIR, 'llm-transcripts.log');
 const LLM_STATS_FILE = path.join(LLM_LOG_DIR, 'llm-stats.json');
 
 const nowIsoString = () => new Date().toISOString();
+
+const resolveLlmConfiguration = () => {
+  const hasOpenRouter = Boolean(openRouterApiKey);
+  const hasLocal = Boolean(llmEndpoint);
+  const provider = hasOpenRouter ? 'openrouter' : hasLocal ? 'local' : 'unconfigured';
+  const model = hasOpenRouter ? openRouterModel || llmDefaultModel : llmDefaultModel;
+
+  return {
+    provider,
+    model,
+    endpoint: provider === 'openrouter' ? openRouterApiUrl : provider === 'local' ? llmEndpoint : null,
+    fallbackModel: llmDefaultModel,
+    openRouterModel: openRouterModel || null,
+    allowsFallback: hasOpenRouter && hasLocal,
+    timestamp: nowIsoString(),
+  };
+};
+
+const encodeHeaderPayload = (payload) => {
+  try {
+    return Buffer.from(JSON.stringify(payload)).toString('base64');
+  } catch (_error) {
+    return '';
+  }
+};
 
 const ensureDataFile = () => {
   const dataDir = path.dirname(DATA_FILE);
@@ -351,7 +377,7 @@ const invokeChatCompletion = async (requestBody, { contextLabel = 'llm-request' 
         responsePayload: data,
         durationMs,
       });
-      return { data, provider: 'openrouter', model: basePayload.model };
+      return { data, provider: 'openrouter', model: basePayload.model, durationMs };
     } catch (error) {
       const durationMs = Date.now() - openRouterStart;
       logLlmInteraction({
@@ -386,7 +412,7 @@ const invokeChatCompletion = async (requestBody, { contextLabel = 'llm-request' 
       responsePayload: data,
       durationMs,
     });
-    return { data, provider: 'local', model: basePayload.model };
+    return { data, provider: 'local', model: basePayload.model, durationMs };
   } catch (error) {
     const durationMs = Date.now() - localStart;
     logLlmInteraction({
@@ -988,6 +1014,7 @@ Reference the action id in generated components so downstream services can invok
   const maxAttemptsWithoutTool = 2;
   const schemaAvailable = Boolean(filteredSchema);
   let enforceSchema = schemaAvailable && availableToolNames.length === 0;
+  let lastCallMeta = null;
 
   const resolvedModel = openRouterModel || llmDefaultModel;
   if (!resolvedModel) {
@@ -1014,9 +1041,17 @@ Reference the action id in generated components so downstream services can invok
     }
 
     console.log(requestPayload);
-    const { data: llmData, provider } = await invokeChatCompletion(requestPayload, { contextLabel: 'ui-generation' });
+    const { data: llmData, provider, model: responseModel, durationMs } = await invokeChatCompletion(requestPayload, { contextLabel: 'ui-generation' });
     console.log(`[KB] LLM provider ${provider} returned data for ui-generation (schema enforced? ${enforceSchema}).`);
     console.log('LLM Data:', llmData);
+
+    lastCallMeta = {
+      provider,
+      model: responseModel,
+      durationMs,
+      usage: llmData?.usage || null,
+      timestamp: nowIsoString(),
+    };
 
     const responseMessage = llmData?.choices?.[0]?.message;
     if (!responseMessage) {
@@ -1198,7 +1233,7 @@ Reference the action id in generated components so downstream services can invok
     }
   }
 
-  return uiDefinition;
+  return { uiDefinition, meta: lastCallMeta };
 }
 
 const deriveThingIdFromActionId = (actionId = '') => {
@@ -1548,6 +1583,10 @@ app.get('/documents', (req, res) => {
   res.json({ count: documents.length, documents });
 });
 
+app.get('/llm-config', (_req, res) => {
+  res.json(resolveLlmConfiguration());
+});
+
 app.post('/documents', (req, res) => {
   try {
     const { id, content, metadata, tags } = req.body;
@@ -1604,7 +1643,7 @@ app.post('/query', async (req, res) => {
   });
 
   try {
-    let generatedUi = await runAgent({
+    const { uiDefinition, meta } = await runAgent({
       prompt,
       thingDescription,
       capabilities,
@@ -1617,6 +1656,8 @@ app.post('/query', async (req, res) => {
       thingActions,
       availableThings,
     });
+
+    let generatedUi = uiDefinition;
 
     if (generatedUi) {
       const fallbackThingId = device?.thingId
@@ -1633,6 +1674,26 @@ app.post('/query', async (req, res) => {
         ],
       };
     }
+    if (meta) {
+      if (meta.provider) {
+        res.set('X-KB-LLM-Provider', String(meta.provider));
+      }
+      if (meta.model) {
+        res.set('X-KB-LLM-Model', String(meta.model));
+      }
+      if (typeof meta.durationMs === 'number' && Number.isFinite(meta.durationMs)) {
+        res.set('X-KB-LLM-Call-Duration', String(meta.durationMs));
+      }
+      const usageJson = meta.usage && typeof meta.usage === 'object' ? JSON.stringify(meta.usage) : null;
+      if (usageJson) {
+        res.set('X-KB-LLM-Usage', usageJson);
+      }
+      const encodedMeta = encodeHeaderPayload(meta);
+      if (encodedMeta) {
+        res.set('X-KB-LLM-Meta', encodedMeta);
+      }
+    }
+
     console.log('[KB] Returning generated UI payload.');
     res.json(generatedUi);
   } catch (error) {

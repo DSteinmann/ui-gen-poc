@@ -1,0 +1,178 @@
+{
+  "suite": "kb-alignment",
+  "version": "2025-12-09",
+  "description": "Benchmark prompts derived from the seeded knowledge-base documents so we can score whether the UI generator honors modality guidance and theme preferences.",
+  "scenarios": [
+    {
+      "id": "hands-occupied-audio-guidance",
+      "name": "Hands-occupied lighting change",
+      "tags": ["modality", "hands-occupied", "audio-first"],
+      "sourceDocuments": ["modality-guideline-hands-occupied"],
+      "prompt": "Activity recognizer reports the state \"hands-occupied\" while the resident asks the tablet to dim the hallway sconces. Describe the UI response the device should render.",
+      "inputs": {
+        "sensorState": "hands-occupied",
+        "requestedAction": "dim hallway sconces",
+        "device": "tablet"
+      },
+      "expected": {
+        "requiredBehaviors": [
+          "Prioritize spoken/audio-first prompts so the user does not need to touch the display",
+          "Explain the modality choice by referencing the hands-occupied state",
+          "Offer only minimal-touch fallbacks (single button or confirmation chip) if a tactile control is unavoidable"
+        ],
+        "scoringRubric": [
+          { "criterion": "Audio priority", "points": 2, "description": "Clearly states that instructions are delivered verbally and the UI minimizes touch." },
+          { "criterion": "Guideline citation", "points": 1, "description": "References or paraphrases the hands-occupied guideline as the reason for the modality." },
+          { "criterion": "Fallback safety", "points": 1, "description": "Any tactile element is optional or secondary and described as a fallback." }
+        ]
+      },
+      "failureSignals": [
+        "Displays a new grid of touch buttons as the primary interaction",
+        "Omits any mention of audio guidance when the user cannot use their hands"
+      ]
+    },
+    {
+      "id": "hands-free-tactile-controls",
+      "name": "Hands-free lighting surface",
+      "tags": ["modality", "hands-free", "tactile"],
+      "sourceDocuments": ["modality-guideline-hands-occupied"],
+      "prompt": "Sensors switch to \"hands-free\" as the resident requests lighting controls for the living room. What UI sections should the tablet render?",
+      "inputs": {
+        "sensorState": "hands-free",
+        "requestedAction": "toggle living-room lighting",
+        "device": "tablet"
+      },
+      "expected": {
+        "requiredBehaviors": [
+          "Surface tactile controls such as buttons or toggles for the light switch",
+          "Call out that the hands-free context enables direct manipulation",
+          "Keep controls grouped in a reachable band (e.g., hero/controls region)"
+        ],
+        "scoringRubric": [
+          { "criterion": "Tactile emphasis", "points": 2, "description": "Buttons or toggles are the primary affordances and described in detail." },
+          { "criterion": "Context acknowledgement", "points": 1, "description": "Hands-free state is referenced as the justification." }
+        ]
+      },
+      "failureSignals": [
+        "Falls back to audio guidance or hides buttons despite hands-free state",
+        "Does not mention any tactile control"
+      ]
+    },
+    {
+      "id": "theme-primary-preference",
+      "name": "Apply preferred accent",
+      "tags": ["theme", "primary-color", "accessibility"],
+      "sourceDocuments": ["user-preference-primary-color"],
+      "prompt": "No theme metadata is provided in the UI definition. Derive the accent tokens the renderer should use based on household preferences.",
+      "inputs": {
+        "themeProvided": false,
+        "components": ["buttons", "toggles", "status cards"]
+      },
+      "expected": {
+        "requiredBehaviors": [
+          "Set theme.primaryColor to #808080 exactly",
+          "State that text or iconography on top of this accent must be light to maintain contrast",
+          "Mention that the choice comes from a stored user preference"
+        ],
+        "scoringRubric": [
+          { "criterion": "Correct color", "points": 2, "description": "Outputs #808080 as the accent." },
+          { "criterion": "Contrast guidance", "points": 1, "description": "Mentions light text or other contrast considerations." },
+          { "criterion": "Preference citation", "points": 1, "description": "Attributes the decision to the preference document." }
+        ]
+      },
+      "failureSignals": [
+        "Suggests any color other than #808080",
+        "Does not mention contrast requirements"
+      ]
+    },
+    {
+      "id": "theme-conflict-remediation",
+      "name": "Resolve conflicting theme",
+      "tags": ["theme", "compliance", "audit"],
+      "sourceDocuments": ["user-preference-primary-color"],
+      "prompt": "The current UI preview shows royal-blue buttons even though the user profile specifies an accent preference. Explain what needs to change and why.",
+      "inputs": {
+        "currentAccent": "#2563eb",
+        "preferenceAccent": "#808080",
+        "issue": "mismatched accent"
+      },
+      "expected": {
+        "requiredBehaviors": [
+          "Identify the mismatch between the live accent and the preference",
+          "Recommend overriding buttons/toggles/status cards to use #808080",
+          "Restate the contrast requirement (light text) when applying the new accent",
+          "Mention any user communication or logging step to capture the correction"
+        ],
+        "scoringRubric": [
+          { "criterion": "Mismatch detection", "points": 1, "description": "States clearly that #2563eb violates the preference." },
+          { "criterion": "Correction plan", "points": 2, "description": "Explains concrete UI changes using #808080." },
+          { "criterion": "Contrast + rationale", "points": 1, "description": "Notes light text and cites the preference source." }
+        ]
+      },
+      "failureSignals": [
+        "Accepts the blue accent with no remediation",
+        "Fails to mention the stored preference"
+      ]
+    },
+    {
+      "id": "state-transition-guidance",
+      "name": "Hands state transition",
+      "tags": ["modality", "state-change", "fallthrough"],
+      "sourceDocuments": ["modality-guideline-hands-occupied"],
+      "prompt": "The activity recognizer flips from \"hands-occupied\" to \"hands-free\" mid-task while the resident is adjusting lighting scenes. Describe how the UI should adapt.",
+      "inputs": {
+        "initialState": "hands-occupied",
+        "newState": "hands-free",
+        "task": "lighting scenes"
+      },
+      "expected": {
+        "requiredBehaviors": [
+          "Start with audio-first instructions while the state is hands-occupied",
+          "Detect the transition and introduce tactile controls once hands-free is confirmed",
+          "Explain the transition to the user (e.g., toast or subtle banner)",
+          "Ensure theme accents still honor #808080"
+        ],
+        "scoringRubric": [
+          { "criterion": "Initial modality", "points": 1, "description": "Begins with audio guidance." },
+          { "criterion": "Adaptive switch", "points": 2, "description": "Clearly states how tactile controls appear after the state change." },
+          { "criterion": "User communication", "points": 1, "description": "Mentions how the switch is communicated." },
+          { "criterion": "Theme consistency", "points": 1, "description": "Reminds to retain #808080 accent." }
+        ]
+      },
+      "failureSignals": [
+        "Keeps only audio guidance even after hands-free",
+        "Changes theme colors during the transition"
+      ]
+    },
+    {
+      "id": "audit-checklist",
+      "name": "KB compliance audit",
+      "tags": ["audit", "theme", "modality"],
+      "sourceDocuments": [
+        "modality-guideline-hands-occupied",
+        "user-preference-primary-color"
+      ],
+      "prompt": "Produce a checklist the QA team can use to verify that a generated tablet layout respects both the modality guideline and the accent preference.",
+      "inputs": {
+        "artifact": "tablet layout spec",
+        "checks": ["modality", "theme"]
+      },
+      "expected": {
+        "requiredBehaviors": [
+          "List at least three modality checks (hands-occupied audio, hands-free tactile, transitions)",
+          "List at least two theme checks (accent equals #808080, light text over accent)",
+          "Tie every checklist item to the relevant document id"
+        ],
+        "scoringRubric": [
+          { "criterion": "Modality coverage", "points": 2, "description": "Includes distinct checks for occupied, free, and fallback cases." },
+          { "criterion": "Theme coverage", "points": 2, "description": "Covers accent value plus contrast." },
+          { "criterion": "Document traceability", "points": 1, "description": "Each check references the source document." }
+        ]
+      },
+      "failureSignals": [
+        "Checklist omits either modality or theme",
+        "No references back to KB documents"
+      ]
+    }
+  ]
+}

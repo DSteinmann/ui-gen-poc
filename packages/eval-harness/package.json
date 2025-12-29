@@ -1,0 +1,21 @@
+{
+  "name": "eval-harness",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CLI harness that replays the knowledge-base eval suite prompts against a chat-completions endpoint.",
+  "scripts": {
+    "start": "node ./src/start.js",
+    "eval": "node ./src/cli.js",
+    "test": "node ./src/cli.js --dry-run"
+  },
+  "bin": {
+    "eval-harness": "./src/cli.js"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^11.1.0",
+    "dotenv": "^16.4.5",
+    "node-fetch": "^3.3.2"
+  }
+}

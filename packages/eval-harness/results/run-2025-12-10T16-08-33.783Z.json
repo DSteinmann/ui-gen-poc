@@ -1,0 +1,4711 @@
+{
+  "generatedAt": "2025-12-10T16:08:33.781Z",
+  "suite": "kb-alignment",
+  "version": "2025-12-09",
+  "config": {
+    "model": "x-ai/grok-code-fast-1",
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "provider": "openrouter",
+    "suitePath": "/Users/dom/projects/IMP/packages/knowledge-base/eval-suite.json",
+    "kbDataPath": "/Users/dom/projects/IMP/packages/knowledge-base/kb-data.json",
+    "kbUrl": "http://localhost:3005",
+    "schemaPath": "/Users/dom/projects/IMP/packages/tablet-device/schema.json",
+    "dryRun": false,
+    "mode": "kb",
+    "resolvedLlmConfig": {
+      "provider": "openrouter",
+      "model": "x-ai/grok-code-fast-1",
+      "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+      "fallbackModel": "gemma 3b",
+      "openRouterModel": "x-ai/grok-code-fast-1",
+      "allowsFallback": true,
+      "timestamp": "2025-12-10T16:07:11.811Z"
+    }
+  },
+  "results": [
+    {
+      "scenarioId": "hands-occupied-audio-guidance",
+      "name": "Hands-occupied lighting change",
+      "mode": "kb",
+      "prompt": "You are a UI planning assistant for a tablet experience. Use the provided requirement documents to craft a response that explains what the tablet should render or say. Always cite the relevant document ids in parentheses when referencing a guideline.\n\nDocument modality-guideline-hands-occupied (source: safety-guidelines):\nWhen the user activity sensor reports the state \"hands-occupied\", prefer audio-first guidance. Provide spoken prompts and minimize the need for direct touch input. When the sensor reports \"hands-free\", present tactile controls such as buttons or toggles for the light switch.\n\nScenario prompt: Activity recognizer reports the state \"hands-occupied\" while the resident asks the tablet to dim the hallway sconces. Describe the UI response the device should render.\n\nContext inputs:\n{\n  \"sensorState\": \"hands-occupied\",\n  \"requestedAction\": \"dim hallway sconces\",\n  \"device\": \"tablet\"\n}\n\nRequired behaviors:\n- Prioritize spoken/audio-first prompts so the user does not need to touch the display\n- Explain the modality choice by referencing the hands-occupied state\n- Offer only minimal-touch fallbacks (single button or confirmation chip) if a tactile control is unavoidable\n\nAvoid the following failure modes:\n- Displays a new grid of touch buttons as the primary interaction\n- Omits any mention of audio guidance when the user cannot use their hands\n\nRespond with two sections: (1) \"Plan\" — short paragraphs describing the approach, (2) \"Checks\" — bullet list referencing document ids.",
+      "answer": "{\n  \"theme\": {\n    \"primaryColor\": \"#1E90FF\"\n  },\n  \"components\": [\n    {\n      \"type\": \"container\",\n      \"props\": {\n        \"children\": [\n          {\n            \"type\": \"text\",\n            \"props\": {\n              \"text\": \"Hands-occupied state detected. Providing audio guidance for your request to dim the hallway sconces. Please listen for spoken prompts and respond verbally if needed.\",\n              \"variant\": \"body\",\n              \"size\": \"medium\",\n              \"layout\": \"center\"\n            }\n          },\n          {\n            \"type\": \"statusCard\",\n            \"props\": {\n              \"title\": \"Hallway Sconces\",\n              \"value\": \"Dimming Requested (Audio Confirmation Pending)\",\n              \"icon\": \"lightbulb\",\n              \"tone\": \"info\",\n              \"items\": [\n                {\n                  \"label\": \"Status\",\n                  \"value\": \"Awaiting action registration\"\n                },\n                {\n                  \"label\": \"Guidance\",\n                  \"value\": \"Audio-first mode active due to hands-occupied\"\n                }\n              ],\n              \"layout\": \"center\"\n            }\n          }\n        ],\n        \"layout\": \"vertical\",\n        \"placement\": \"center\"\n      }\n    }\n  ]\n}",
+      "durationMs": 31351.2915,
+      "flaggedSignals": [],
+      "rawResponse": {
+        "theme": {
+          "primaryColor": "#1E90FF"
+        },
+        "components": [
+          {
+            "type": "container",
+            "props": {
+              "children": [
+                {
+                  "type": "text",
+                  "props": {
+                    "text": "Hands-occupied state detected. Providing audio guidance for your request to dim the hallway sconces. Please listen for spoken prompts and respond verbally if needed.",
+                    "variant": "body",
+                    "size": "medium",
+                    "layout": "center"
+                  }
+                },
+                {
+                  "type": "statusCard",
+                  "props": {
+                    "title": "Hallway Sconces",
+                    "value": "Dimming Requested (Audio Confirmation Pending)",
+                    "icon": "lightbulb",
+                    "tone": "info",
+                    "items": [
+                      {
+                        "label": "Status",
+                        "value": "Awaiting action registration"
+                      },
+                      {
+                        "label": "Guidance",
+                        "value": "Audio-first mode active due to hands-occupied"
+                      }
+                    ],
+                    "layout": "center"
+                  }
+                }
+              ],
+              "layout": "vertical",
+              "placement": "center"
+            }
+          }
+        ]
+      },
+      "llmMeta": {
+        "provider": "openrouter",
+        "model": "x-ai/grok-code-fast-1",
+        "durationMs": 31304,
+        "usage": {
+          "prompt_tokens": 961,
+          "completion_tokens": 1311,
+          "total_tokens": 2272,
+          "cost": 0.00212414,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 192,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": null,
+            "upstream_inference_prompt_cost": 0.00015764,
+            "upstream_inference_completions_cost": 0.0019665
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 1054,
+            "image_tokens": 0
+          }
+        },
+        "timestamp": "2025-12-10T16:07:43.152Z"
+      },
+      "kbPayload": {
+        "prompt": "Activity recognizer reports the state \"hands-occupied\" while the resident asks the tablet to dim the hallway sconces. Describe the UI response the device should render.",
+        "schema": {
+          "name": "tablet-dashboard-ui",
+          "description": "Schema for the large-format tablet/laptop renderer. Supports explicit layout hints so the KB can describe a multi-column dashboard.",
+          "components": {
+            "text": {
+              "props": {
+                "text": "string",
+                "variant": "string",
+                "size": "string",
+                "layout": "layoutInstruction"
+              }
+            },
+            "button": {
+              "props": {
+                "label": "string",
+                "style": "string",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "toggle": {
+              "props": {
+                "label": "string",
+                "checked": "boolean",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "slider": {
+              "props": {
+                "label": "string",
+                "min": "number",
+                "max": "number",
+                "step": "number",
+                "value": "number",
+                "unit": "string",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "dropdown": {
+              "props": {
+                "label": "string",
+                "placeholder": "string",
+                "options": "array",
+                "value": "string",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "statusCard": {
+              "props": {
+                "title": "string",
+                "value": "string",
+                "icon": "string",
+                "tone": "string",
+                "items": "array",
+                "layout": "layoutInstruction"
+              }
+            },
+            "container": {
+              "props": {
+                "children": "array",
+                "layout": "string",
+                "placement": "layoutInstruction"
+              }
+            }
+          },
+          "theming": {
+            "description": "Supports `theme.primaryColor` and `theme.surfaceTint` for accent styling across cards and controls.",
+            "supportsPrimaryColor": true,
+            "defaultPrimaryColor": "#2563eb"
+          },
+          "context": {
+            "modalityPreference": "visual-large-format",
+            "defaultErgonomicsProfile": "cozy-desktop",
+            "supportedErgonomicsProfiles": [
+              {
+                "id": "cozy-desktop",
+                "label": "Cozy desktop",
+                "description": "Comfortable spacing for seated interaction on tablets or laptops."
+              },
+              {
+                "id": "information-dense",
+                "label": "Information dense",
+                "description": "Tighter spacing for dashboards that prioritize data density."
+              }
+            ]
+          },
+          "responseSchema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "Tablet/Laptop UI Schema",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "deviceId": {
+                "type": "string",
+                "description": "Identifier of the target tablet device that should render this UI definition."
+              },
+              "generatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Timestamp indicating when the UI was generated."
+              },
+              "context": {
+                "type": "object",
+                "description": "Arbitrary context metadata (thing references, device info, etc.).",
+                "additionalProperties": true
+              },
+              "theme": {
+                "type": "object",
+                "properties": {
+                  "primaryColor": {
+                    "type": "string",
+                    "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+                    "description": "Hexadecimal color value representing the preferred primary accent color."
+                  },
+                  "surfaceTint": {
+                    "type": "string",
+                    "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+                    "description": "Optional translucent wash to apply to containers."
+                  }
+                },
+                "additionalProperties": false
+              },
+              "components": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/definitions/component"
+                }
+              }
+            },
+            "required": [
+              "components"
+            ],
+            "definitions": {
+              "layoutInstruction": {
+                "type": "object",
+                "description": "Optional placement hint for the 12-column responsive grid rendered by the tablet device.",
+                "additionalProperties": false,
+                "properties": {
+                  "region": {
+                    "type": "string",
+                    "description": "Named region hint such as 'hero', 'sidebar', 'controls', or 'telemetry'."
+                  },
+                  "column": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "col": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "colSpan": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "span": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "row": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "rowSpan": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "x": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12,
+                    "description": "Alias for `column`."
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Alias for `row`."
+                  },
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12,
+                    "description": "Alias for `colSpan`."
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Alias for `rowSpan`."
+                  },
+                  "order": {
+                    "type": "integer",
+                    "description": "Optional ordering hint when auto-flow is used."
+                  },
+                  "align": {
+                    "type": "string",
+                    "enum": [
+                      "start",
+                      "center",
+                      "end",
+                      "stretch"
+                    ],
+                    "description": "Justify-self alignment inside the grid cell."
+                  },
+                  "justify": {
+                    "type": "string",
+                    "enum": [
+                      "start",
+                      "center",
+                      "end",
+                      "stretch"
+                    ],
+                    "description": "Align-self hint inside the grid cell."
+                  },
+                  "minHeight": {
+                    "type": "string",
+                    "description": "CSS size for minimum height (e.g., '180px')."
+                  },
+                  "maxHeight": {
+                    "type": "string",
+                    "description": "CSS size for maximum height."
+                  },
+                  "layer": {
+                    "type": "string",
+                    "enum": [
+                      "base",
+                      "overlay"
+                    ],
+                    "description": "Whether the element should float as an overlay card."
+                  }
+                }
+              },
+              "component": {
+                "oneOf": [
+                  {
+                    "$ref": "#/definitions/containerComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/textComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/buttonComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/toggleComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/sliderComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/dropdownComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/statusCardComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/toolCall"
+                  }
+                ]
+              },
+              "containerComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "container"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "description": "Layout strategy for child composition (grid, row, column).",
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/definitions/layoutInstruction"
+                      }
+                    ]
+                  },
+                  "placement": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Optional thing identifier that all nested children primarily control."
+                  },
+                  "children": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "$ref": "#/definitions/component"
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "children"
+                ]
+              },
+              "textComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "text"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "variant": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "tone": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Optional thing identifier this text references when showing state or instructions."
+                  }
+                },
+                "required": [
+                  "type",
+                  "text"
+                ]
+              },
+              "buttonComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "button"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string"
+                  },
+                  "style": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when executing the bound action."
+                  },
+                  "action": {
+                    "description": "Action payload or identifier to execute when the button is pressed.",
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label"
+                ]
+              },
+              "toggleComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "toggle"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "checked": {
+                    "type": "boolean"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when toggling."
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label"
+                ]
+              },
+              "sliderComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "slider"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "min": {
+                    "type": "number",
+                    "default": 0
+                  },
+                  "max": {
+                    "type": "number",
+                    "default": 100
+                  },
+                  "step": {
+                    "type": "number",
+                    "default": 1
+                  },
+                  "value": {
+                    "type": "number"
+                  },
+                  "unit": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when sending slider updates."
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label"
+                ]
+              },
+              "dropdownComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "dropdown"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "placeholder": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when selection changes."
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label",
+                  "options"
+                ]
+              },
+              "statusCardComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "statusCard"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string"
+                  },
+                  "tone": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier whose state this card summarizes."
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "title"
+                ]
+              },
+              "toolCall": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "toolCall"
+                  },
+                  "tool": {
+                    "type": "string"
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier providing context for the tool output."
+                  }
+                },
+                "required": [
+                  "type",
+                  "tool"
+                ]
+              }
+            }
+          }
+        },
+        "capabilityData": {
+          "sensorState": "hands-occupied",
+          "requestedAction": "dim hallway sconces",
+          "device": "tablet"
+        },
+        "uiContext": {
+          "scenarioId": "hands-occupied-audio-guidance",
+          "tags": [
+            "modality",
+            "hands-occupied",
+            "audio-first"
+          ],
+          "inputs": {
+            "sensorState": "hands-occupied",
+            "requestedAction": "dim hallway sconces",
+            "device": "tablet"
+          }
+        },
+        "deviceId": "device-tablet-eval",
+        "device": {
+          "id": "device-tablet-eval",
+          "deviceId": "device-tablet-eval",
+          "label": "Evaluation Tablet",
+          "type": "tablet",
+          "ergonomicsProfile": "cozy-desktop"
+        }
+      }
+    },
+    {
+      "scenarioId": "hands-free-tactile-controls",
+      "name": "Hands-free lighting surface",
+      "mode": "kb",
+      "prompt": "You are a UI planning assistant for a tablet experience. Use the provided requirement documents to craft a response that explains what the tablet should render or say. Always cite the relevant document ids in parentheses when referencing a guideline.\n\nDocument modality-guideline-hands-occupied (source: safety-guidelines):\nWhen the user activity sensor reports the state \"hands-occupied\", prefer audio-first guidance. Provide spoken prompts and minimize the need for direct touch input. When the sensor reports \"hands-free\", present tactile controls such as buttons or toggles for the light switch.\n\nScenario prompt: Sensors switch to \"hands-free\" as the resident requests lighting controls for the living room. What UI sections should the tablet render?\n\nContext inputs:\n{\n  \"sensorState\": \"hands-free\",\n  \"requestedAction\": \"toggle living-room lighting\",\n  \"device\": \"tablet\"\n}\n\nRequired behaviors:\n- Surface tactile controls such as buttons or toggles for the light switch\n- Call out that the hands-free context enables direct manipulation\n- Keep controls grouped in a reachable band (e.g., hero/controls region)\n\nAvoid the following failure modes:\n- Falls back to audio guidance or hides buttons despite hands-free state\n- Does not mention any tactile control\n\nRespond with two sections: (1) \"Plan\" — short paragraphs describing the approach, (2) \"Checks\" — bullet list referencing document ids.",
+      "answer": "{\n  \"theme\": {\n    \"primaryColor\": \"#1E90FF\"\n  },\n  \"ui\": {\n    \"type\": \"container\",\n    \"props\": {\n      \"children\": [\n        {\n          \"type\": \"text\",\n          \"props\": {\n            \"text\": \"Living Room Lighting Controls\",\n            \"variant\": \"heading\",\n            \"size\": \"large\",\n            \"layout\": {}\n          }\n        },\n        {\n          \"type\": \"text\",\n          \"props\": {\n            \"text\": \"Sensors indicate hands-free state. Use the toggle below to control lighting.\",\n            \"variant\": \"body\",\n            \"size\": \"medium\",\n            \"layout\": {}\n          }\n        },\n        {\n          \"type\": \"toggle\",\n          \"props\": {\n            \"label\": \"Living Room Light\",\n            \"checked\": false,\n            \"size\": \"medium\",\n            \"layout\": {},\n            \"action\": null\n          }\n        }\n      ],\n      \"layout\": \"vertical\",\n      \"placement\": {}\n    }\n  }\n}",
+      "durationMs": 14349.462667,
+      "flaggedSignals": [],
+      "rawResponse": {
+        "theme": {
+          "primaryColor": "#1E90FF"
+        },
+        "ui": {
+          "type": "container",
+          "props": {
+            "children": [
+              {
+                "type": "text",
+                "props": {
+                  "text": "Living Room Lighting Controls",
+                  "variant": "heading",
+                  "size": "large",
+                  "layout": {}
+                }
+              },
+              {
+                "type": "text",
+                "props": {
+                  "text": "Sensors indicate hands-free state. Use the toggle below to control lighting.",
+                  "variant": "body",
+                  "size": "medium",
+                  "layout": {}
+                }
+              },
+              {
+                "type": "toggle",
+                "props": {
+                  "label": "Living Room Light",
+                  "checked": false,
+                  "size": "medium",
+                  "layout": {},
+                  "action": null
+                }
+              }
+            ],
+            "layout": "vertical",
+            "placement": {}
+          }
+        }
+      },
+      "llmMeta": {
+        "provider": "openrouter",
+        "model": "x-ai/grok-code-fast-1",
+        "durationMs": 14321,
+        "usage": {
+          "prompt_tokens": 955,
+          "completion_tokens": 1091,
+          "total_tokens": 2046,
+          "cost": 0.00179294,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 192,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": null,
+            "upstream_inference_prompt_cost": 0.00015644,
+            "upstream_inference_completions_cost": 0.0016365
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 877,
+            "image_tokens": 0
+          }
+        },
+        "timestamp": "2025-12-10T16:07:57.505Z"
+      },
+      "kbPayload": {
+        "prompt": "Sensors switch to \"hands-free\" as the resident requests lighting controls for the living room. What UI sections should the tablet render?",
+        "schema": {
+          "name": "tablet-dashboard-ui",
+          "description": "Schema for the large-format tablet/laptop renderer. Supports explicit layout hints so the KB can describe a multi-column dashboard.",
+          "components": {
+            "text": {
+              "props": {
+                "text": "string",
+                "variant": "string",
+                "size": "string",
+                "layout": "layoutInstruction"
+              }
+            },
+            "button": {
+              "props": {
+                "label": "string",
+                "style": "string",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "toggle": {
+              "props": {
+                "label": "string",
+                "checked": "boolean",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "slider": {
+              "props": {
+                "label": "string",
+                "min": "number",
+                "max": "number",
+                "step": "number",
+                "value": "number",
+                "unit": "string",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "dropdown": {
+              "props": {
+                "label": "string",
+                "placeholder": "string",
+                "options": "array",
+                "value": "string",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "statusCard": {
+              "props": {
+                "title": "string",
+                "value": "string",
+                "icon": "string",
+                "tone": "string",
+                "items": "array",
+                "layout": "layoutInstruction"
+              }
+            },
+            "container": {
+              "props": {
+                "children": "array",
+                "layout": "string",
+                "placement": "layoutInstruction"
+              }
+            }
+          },
+          "theming": {
+            "description": "Supports `theme.primaryColor` and `theme.surfaceTint` for accent styling across cards and controls.",
+            "supportsPrimaryColor": true,
+            "defaultPrimaryColor": "#2563eb"
+          },
+          "context": {
+            "modalityPreference": "visual-large-format",
+            "defaultErgonomicsProfile": "cozy-desktop",
+            "supportedErgonomicsProfiles": [
+              {
+                "id": "cozy-desktop",
+                "label": "Cozy desktop",
+                "description": "Comfortable spacing for seated interaction on tablets or laptops."
+              },
+              {
+                "id": "information-dense",
+                "label": "Information dense",
+                "description": "Tighter spacing for dashboards that prioritize data density."
+              }
+            ]
+          },
+          "responseSchema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "Tablet/Laptop UI Schema",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "deviceId": {
+                "type": "string",
+                "description": "Identifier of the target tablet device that should render this UI definition."
+              },
+              "generatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Timestamp indicating when the UI was generated."
+              },
+              "context": {
+                "type": "object",
+                "description": "Arbitrary context metadata (thing references, device info, etc.).",
+                "additionalProperties": true
+              },
+              "theme": {
+                "type": "object",
+                "properties": {
+                  "primaryColor": {
+                    "type": "string",
+                    "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+                    "description": "Hexadecimal color value representing the preferred primary accent color."
+                  },
+                  "surfaceTint": {
+                    "type": "string",
+                    "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+                    "description": "Optional translucent wash to apply to containers."
+                  }
+                },
+                "additionalProperties": false
+              },
+              "components": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/definitions/component"
+                }
+              }
+            },
+            "required": [
+              "components"
+            ],
+            "definitions": {
+              "layoutInstruction": {
+                "type": "object",
+                "description": "Optional placement hint for the 12-column responsive grid rendered by the tablet device.",
+                "additionalProperties": false,
+                "properties": {
+                  "region": {
+                    "type": "string",
+                    "description": "Named region hint such as 'hero', 'sidebar', 'controls', or 'telemetry'."
+                  },
+                  "column": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "col": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "colSpan": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "span": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "row": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "rowSpan": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "x": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12,
+                    "description": "Alias for `column`."
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Alias for `row`."
+                  },
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12,
+                    "description": "Alias for `colSpan`."
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Alias for `rowSpan`."
+                  },
+                  "order": {
+                    "type": "integer",
+                    "description": "Optional ordering hint when auto-flow is used."
+                  },
+                  "align": {
+                    "type": "string",
+                    "enum": [
+                      "start",
+                      "center",
+                      "end",
+                      "stretch"
+                    ],
+                    "description": "Justify-self alignment inside the grid cell."
+                  },
+                  "justify": {
+                    "type": "string",
+                    "enum": [
+                      "start",
+                      "center",
+                      "end",
+                      "stretch"
+                    ],
+                    "description": "Align-self hint inside the grid cell."
+                  },
+                  "minHeight": {
+                    "type": "string",
+                    "description": "CSS size for minimum height (e.g., '180px')."
+                  },
+                  "maxHeight": {
+                    "type": "string",
+                    "description": "CSS size for maximum height."
+                  },
+                  "layer": {
+                    "type": "string",
+                    "enum": [
+                      "base",
+                      "overlay"
+                    ],
+                    "description": "Whether the element should float as an overlay card."
+                  }
+                }
+              },
+              "component": {
+                "oneOf": [
+                  {
+                    "$ref": "#/definitions/containerComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/textComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/buttonComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/toggleComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/sliderComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/dropdownComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/statusCardComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/toolCall"
+                  }
+                ]
+              },
+              "containerComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "container"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "description": "Layout strategy for child composition (grid, row, column).",
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/definitions/layoutInstruction"
+                      }
+                    ]
+                  },
+                  "placement": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Optional thing identifier that all nested children primarily control."
+                  },
+                  "children": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "$ref": "#/definitions/component"
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "children"
+                ]
+              },
+              "textComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "text"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "variant": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "tone": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Optional thing identifier this text references when showing state or instructions."
+                  }
+                },
+                "required": [
+                  "type",
+                  "text"
+                ]
+              },
+              "buttonComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "button"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string"
+                  },
+                  "style": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when executing the bound action."
+                  },
+                  "action": {
+                    "description": "Action payload or identifier to execute when the button is pressed.",
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label"
+                ]
+              },
+              "toggleComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "toggle"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "checked": {
+                    "type": "boolean"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when toggling."
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label"
+                ]
+              },
+              "sliderComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "slider"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "min": {
+                    "type": "number",
+                    "default": 0
+                  },
+                  "max": {
+                    "type": "number",
+                    "default": 100
+                  },
+                  "step": {
+                    "type": "number",
+                    "default": 1
+                  },
+                  "value": {
+                    "type": "number"
+                  },
+                  "unit": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when sending slider updates."
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label"
+                ]
+              },
+              "dropdownComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "dropdown"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "placeholder": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when selection changes."
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label",
+                  "options"
+                ]
+              },
+              "statusCardComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "statusCard"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string"
+                  },
+                  "tone": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier whose state this card summarizes."
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "title"
+                ]
+              },
+              "toolCall": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "toolCall"
+                  },
+                  "tool": {
+                    "type": "string"
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier providing context for the tool output."
+                  }
+                },
+                "required": [
+                  "type",
+                  "tool"
+                ]
+              }
+            }
+          }
+        },
+        "capabilityData": {
+          "sensorState": "hands-free",
+          "requestedAction": "toggle living-room lighting",
+          "device": "tablet"
+        },
+        "uiContext": {
+          "scenarioId": "hands-free-tactile-controls",
+          "tags": [
+            "modality",
+            "hands-free",
+            "tactile"
+          ],
+          "inputs": {
+            "sensorState": "hands-free",
+            "requestedAction": "toggle living-room lighting",
+            "device": "tablet"
+          }
+        },
+        "deviceId": "device-tablet-eval",
+        "device": {
+          "id": "device-tablet-eval",
+          "deviceId": "device-tablet-eval",
+          "label": "Evaluation Tablet",
+          "type": "tablet",
+          "ergonomicsProfile": "cozy-desktop"
+        }
+      }
+    },
+    {
+      "scenarioId": "theme-primary-preference",
+      "name": "Apply preferred accent",
+      "mode": "kb",
+      "prompt": "You are a UI planning assistant for a tablet experience. Use the provided requirement documents to craft a response that explains what the tablet should render or say. Always cite the relevant document ids in parentheses when referencing a guideline.\n\nDocument user-preference-primary-color (source: user-profile):\nThe primary household preference for interface accents is the color \"#1E90FF\" (a blue). Whenever possible, set the UI theme primary color to this value so buttons, toggles, and other interactive highlights align with the user preference. Ensure sufficient contrast by using light text on dark backgrounds.\n\nScenario prompt: No theme metadata is provided in the UI definition. Derive the accent tokens the renderer should use based on household preferences.\n\nContext inputs:\n{\n  \"themeProvided\": false,\n  \"components\": [\n    \"buttons\",\n    \"toggles\",\n    \"status cards\"\n  ]\n}\n\nRequired behaviors:\n- Set theme.primaryColor to #808080 exactly\n- State that text or iconography on top of this accent must be light to maintain contrast\n- Mention that the choice comes from a stored user preference\n\nAvoid the following failure modes:\n- Suggests any color other than #808080\n- Does not mention contrast requirements\n\nRespond with two sections: (1) \"Plan\" — short paragraphs describing the approach, (2) \"Checks\" — bullet list referencing document ids.",
+      "answer": "{\n  \"theme\": {\n    \"primaryColor\": \"#1E90FF\"\n  },\n  \"context\": {\n    \"defaultErgonomicsProfile\": \"cozy-desktop\"\n  },\n  \"children\": [\n    {\n      \"component\": \"container\",\n      \"props\": {\n        \"children\": [\n          {\n            \"component\": \"text\",\n            \"props\": {\n              \"text\": \"UI Theme Applied Based on Household Preferences\",\n              \"variant\": \"heading\",\n              \"size\": \"large\",\n              \"layout\": \"center\"\n            }\n          },\n          {\n            \"component\": \"button\",\n            \"props\": {\n              \"label\": \"Accent Button\",\n              \"style\": \"primary\",\n              \"size\": \"medium\",\n              \"layout\": \"center\",\n              \"action\": null\n            }\n          },\n          {\n            \"component\": \"toggle\",\n            \"props\": {\n              \"label\": \"Toggle Example\",\n              \"checked\": false,\n              \"size\": \"medium\",\n              \"layout\": \"center\",\n              \"action\": null\n            }\n          },\n          {\n            \"component\": \"statusCard\",\n            \"props\": {\n              \"title\": \"Theme Status\",\n              \"value\": \"#1E90FF Blue Accent\",\n              \"icon\": \"palette\",\n              \"tone\": \"info\",\n              \"items\": [],\n              \"layout\": \"center\"\n            }\n          }\n        ],\n        \"layout\": \"vertical\",\n        \"placement\": \"center\"\n      }\n    }\n  ]\n}",
+      "durationMs": 10041.318791000005,
+      "flaggedSignals": [],
+      "rawResponse": {
+        "theme": {
+          "primaryColor": "#1E90FF"
+        },
+        "context": {
+          "defaultErgonomicsProfile": "cozy-desktop"
+        },
+        "children": [
+          {
+            "component": "container",
+            "props": {
+              "children": [
+                {
+                  "component": "text",
+                  "props": {
+                    "text": "UI Theme Applied Based on Household Preferences",
+                    "variant": "heading",
+                    "size": "large",
+                    "layout": "center"
+                  }
+                },
+                {
+                  "component": "button",
+                  "props": {
+                    "label": "Accent Button",
+                    "style": "primary",
+                    "size": "medium",
+                    "layout": "center",
+                    "action": null
+                  }
+                },
+                {
+                  "component": "toggle",
+                  "props": {
+                    "label": "Toggle Example",
+                    "checked": false,
+                    "size": "medium",
+                    "layout": "center",
+                    "action": null
+                  }
+                },
+                {
+                  "component": "statusCard",
+                  "props": {
+                    "title": "Theme Status",
+                    "value": "#1E90FF Blue Accent",
+                    "icon": "palette",
+                    "tone": "info",
+                    "items": [],
+                    "layout": "center"
+                  }
+                }
+              ],
+              "layout": "vertical",
+              "placement": "center"
+            }
+          }
+        ]
+      },
+      "llmMeta": {
+        "provider": "openrouter",
+        "model": "x-ai/grok-code-fast-1",
+        "durationMs": 10024,
+        "usage": {
+          "prompt_tokens": 953,
+          "completion_tokens": 1112,
+          "total_tokens": 2065,
+          "cost": 0.00177796,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 448,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": null,
+            "upstream_inference_prompt_cost": 0.00010996,
+            "upstream_inference_completions_cost": 0.001668
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 804,
+            "image_tokens": 0
+          }
+        },
+        "timestamp": "2025-12-10T16:08:07.552Z"
+      },
+      "kbPayload": {
+        "prompt": "No theme metadata is provided in the UI definition. Derive the accent tokens the renderer should use based on household preferences.",
+        "schema": {
+          "name": "tablet-dashboard-ui",
+          "description": "Schema for the large-format tablet/laptop renderer. Supports explicit layout hints so the KB can describe a multi-column dashboard.",
+          "components": {
+            "text": {
+              "props": {
+                "text": "string",
+                "variant": "string",
+                "size": "string",
+                "layout": "layoutInstruction"
+              }
+            },
+            "button": {
+              "props": {
+                "label": "string",
+                "style": "string",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "toggle": {
+              "props": {
+                "label": "string",
+                "checked": "boolean",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "slider": {
+              "props": {
+                "label": "string",
+                "min": "number",
+                "max": "number",
+                "step": "number",
+                "value": "number",
+                "unit": "string",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "dropdown": {
+              "props": {
+                "label": "string",
+                "placeholder": "string",
+                "options": "array",
+                "value": "string",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "statusCard": {
+              "props": {
+                "title": "string",
+                "value": "string",
+                "icon": "string",
+                "tone": "string",
+                "items": "array",
+                "layout": "layoutInstruction"
+              }
+            },
+            "container": {
+              "props": {
+                "children": "array",
+                "layout": "string",
+                "placement": "layoutInstruction"
+              }
+            }
+          },
+          "theming": {
+            "description": "Supports `theme.primaryColor` and `theme.surfaceTint` for accent styling across cards and controls.",
+            "supportsPrimaryColor": true,
+            "defaultPrimaryColor": "#2563eb"
+          },
+          "context": {
+            "modalityPreference": "visual-large-format",
+            "defaultErgonomicsProfile": "cozy-desktop",
+            "supportedErgonomicsProfiles": [
+              {
+                "id": "cozy-desktop",
+                "label": "Cozy desktop",
+                "description": "Comfortable spacing for seated interaction on tablets or laptops."
+              },
+              {
+                "id": "information-dense",
+                "label": "Information dense",
+                "description": "Tighter spacing for dashboards that prioritize data density."
+              }
+            ]
+          },
+          "responseSchema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "Tablet/Laptop UI Schema",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "deviceId": {
+                "type": "string",
+                "description": "Identifier of the target tablet device that should render this UI definition."
+              },
+              "generatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Timestamp indicating when the UI was generated."
+              },
+              "context": {
+                "type": "object",
+                "description": "Arbitrary context metadata (thing references, device info, etc.).",
+                "additionalProperties": true
+              },
+              "theme": {
+                "type": "object",
+                "properties": {
+                  "primaryColor": {
+                    "type": "string",
+                    "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+                    "description": "Hexadecimal color value representing the preferred primary accent color."
+                  },
+                  "surfaceTint": {
+                    "type": "string",
+                    "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+                    "description": "Optional translucent wash to apply to containers."
+                  }
+                },
+                "additionalProperties": false
+              },
+              "components": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/definitions/component"
+                }
+              }
+            },
+            "required": [
+              "components"
+            ],
+            "definitions": {
+              "layoutInstruction": {
+                "type": "object",
+                "description": "Optional placement hint for the 12-column responsive grid rendered by the tablet device.",
+                "additionalProperties": false,
+                "properties": {
+                  "region": {
+                    "type": "string",
+                    "description": "Named region hint such as 'hero', 'sidebar', 'controls', or 'telemetry'."
+                  },
+                  "column": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "col": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "colSpan": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "span": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "row": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "rowSpan": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "x": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12,
+                    "description": "Alias for `column`."
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Alias for `row`."
+                  },
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12,
+                    "description": "Alias for `colSpan`."
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Alias for `rowSpan`."
+                  },
+                  "order": {
+                    "type": "integer",
+                    "description": "Optional ordering hint when auto-flow is used."
+                  },
+                  "align": {
+                    "type": "string",
+                    "enum": [
+                      "start",
+                      "center",
+                      "end",
+                      "stretch"
+                    ],
+                    "description": "Justify-self alignment inside the grid cell."
+                  },
+                  "justify": {
+                    "type": "string",
+                    "enum": [
+                      "start",
+                      "center",
+                      "end",
+                      "stretch"
+                    ],
+                    "description": "Align-self hint inside the grid cell."
+                  },
+                  "minHeight": {
+                    "type": "string",
+                    "description": "CSS size for minimum height (e.g., '180px')."
+                  },
+                  "maxHeight": {
+                    "type": "string",
+                    "description": "CSS size for maximum height."
+                  },
+                  "layer": {
+                    "type": "string",
+                    "enum": [
+                      "base",
+                      "overlay"
+                    ],
+                    "description": "Whether the element should float as an overlay card."
+                  }
+                }
+              },
+              "component": {
+                "oneOf": [
+                  {
+                    "$ref": "#/definitions/containerComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/textComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/buttonComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/toggleComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/sliderComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/dropdownComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/statusCardComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/toolCall"
+                  }
+                ]
+              },
+              "containerComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "container"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "description": "Layout strategy for child composition (grid, row, column).",
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/definitions/layoutInstruction"
+                      }
+                    ]
+                  },
+                  "placement": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Optional thing identifier that all nested children primarily control."
+                  },
+                  "children": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "$ref": "#/definitions/component"
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "children"
+                ]
+              },
+              "textComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "text"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "variant": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "tone": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Optional thing identifier this text references when showing state or instructions."
+                  }
+                },
+                "required": [
+                  "type",
+                  "text"
+                ]
+              },
+              "buttonComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "button"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string"
+                  },
+                  "style": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when executing the bound action."
+                  },
+                  "action": {
+                    "description": "Action payload or identifier to execute when the button is pressed.",
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label"
+                ]
+              },
+              "toggleComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "toggle"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "checked": {
+                    "type": "boolean"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when toggling."
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label"
+                ]
+              },
+              "sliderComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "slider"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "min": {
+                    "type": "number",
+                    "default": 0
+                  },
+                  "max": {
+                    "type": "number",
+                    "default": 100
+                  },
+                  "step": {
+                    "type": "number",
+                    "default": 1
+                  },
+                  "value": {
+                    "type": "number"
+                  },
+                  "unit": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when sending slider updates."
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label"
+                ]
+              },
+              "dropdownComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "dropdown"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "placeholder": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when selection changes."
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label",
+                  "options"
+                ]
+              },
+              "statusCardComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "statusCard"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string"
+                  },
+                  "tone": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier whose state this card summarizes."
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "title"
+                ]
+              },
+              "toolCall": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "toolCall"
+                  },
+                  "tool": {
+                    "type": "string"
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier providing context for the tool output."
+                  }
+                },
+                "required": [
+                  "type",
+                  "tool"
+                ]
+              }
+            }
+          }
+        },
+        "capabilityData": {
+          "themeProvided": false,
+          "components": [
+            "buttons",
+            "toggles",
+            "status cards"
+          ]
+        },
+        "uiContext": {
+          "scenarioId": "theme-primary-preference",
+          "tags": [
+            "theme",
+            "primary-color",
+            "accessibility"
+          ],
+          "inputs": {
+            "themeProvided": false,
+            "components": [
+              "buttons",
+              "toggles",
+              "status cards"
+            ]
+          }
+        },
+        "deviceId": "device-tablet-eval",
+        "device": {
+          "id": "device-tablet-eval",
+          "deviceId": "device-tablet-eval",
+          "label": "Evaluation Tablet",
+          "type": "tablet",
+          "ergonomicsProfile": "cozy-desktop"
+        }
+      }
+    },
+    {
+      "scenarioId": "theme-conflict-remediation",
+      "name": "Resolve conflicting theme",
+      "mode": "kb",
+      "prompt": "You are a UI planning assistant for a tablet experience. Use the provided requirement documents to craft a response that explains what the tablet should render or say. Always cite the relevant document ids in parentheses when referencing a guideline.\n\nDocument user-preference-primary-color (source: user-profile):\nThe primary household preference for interface accents is the color \"#1E90FF\" (a blue). Whenever possible, set the UI theme primary color to this value so buttons, toggles, and other interactive highlights align with the user preference. Ensure sufficient contrast by using light text on dark backgrounds.\n\nScenario prompt: The current UI preview shows royal-blue buttons even though the user profile specifies an accent preference. Explain what needs to change and why.\n\nContext inputs:\n{\n  \"currentAccent\": \"#2563eb\",\n  \"preferenceAccent\": \"#808080\",\n  \"issue\": \"mismatched accent\"\n}\n\nRequired behaviors:\n- Identify the mismatch between the live accent and the preference\n- Recommend overriding buttons/toggles/status cards to use #808080\n- Restate the contrast requirement (light text) when applying the new accent\n- Mention any user communication or logging step to capture the correction\n\nAvoid the following failure modes:\n- Accepts the blue accent with no remediation\n- Fails to mention the stored preference\n\nRespond with two sections: (1) \"Plan\" — short paragraphs describing the approach, (2) \"Checks\" — bullet list referencing document ids.",
+      "answer": "{\n  \"theme\": {\n    \"primaryColor\": \"#1E90FF\"\n  },\n  \"components\": [\n    {\n      \"type\": \"text\",\n      \"props\": {\n        \"text\": \"UI Accent Color Mismatch Issue\",\n        \"variant\": \"heading\",\n        \"size\": \"large\",\n        \"layout\": {\n          \"position\": \"top\",\n          \"alignment\": \"center\"\n        }\n      }\n    },\n    {\n      \"type\": \"text\",\n      \"props\": {\n        \"text\": \"The current UI preview displays buttons in royal-blue (#2563eb), but the user profile specifies an accent preference of #1E90FF (a blue). This mismatch causes the interface to not align with personalized preferences.\",\n        \"variant\": \"body\",\n        \"size\": \"medium\",\n        \"layout\": {\n          \"position\": \"below\",\n          \"alignment\": \"left\"\n        }\n      }\n    },\n    {\n      \"type\": \"statusCard\",\n      \"props\": {\n        \"title\": \"Accent Color Details\",\n        \"value\": \"Mismatch Detected\",\n        \"icon\": \"warning\",\n        \"tone\": \"caution\",\n        \"items\": [\n          {\n            \"label\": \"Current Accent\",\n            \"value\": \"#2563eb (Royal Blue)\"\n          },\n          {\n            \"label\": \"Preferred Accent\",\n            \"value\": \"#1E90FF (User Profile Blue)\"\n          },\n          {\n            \"label\": \"Issue\",\n            \"value\": \"Colors do not match, leading to inconsistency\"\n          }\n        ],\n        \"layout\": {\n          \"position\": \"below\",\n          \"alignment\": \"center\"\n        }\n      }\n    },\n    {\n      \"type\": \"text\",\n      \"props\": {\n        \"text\": \"What needs to change: Update the theme.primaryColor in the UI configuration to '#1E90FF' to ensure buttons, toggles, and interactive elements use the correct accent. This aligns with household personalization preferences for better user experience and contrast.\",\n        \"variant\": \"body\",\n        \"size\": \"medium\",\n        \"layout\": {\n          \"position\": \"below\",\n          \"alignment\": \"left\"\n        }\n      }\n    },\n    {\n      \"type\": \"text\",\n      \"props\": {\n        \"text\": \"Why: The user profile explicitly sets '#1E90FF' as the primary color for interface accents to personalize the UI. Using the wrong color reduces personalization and may affect readability if contrast is not maintained (e.g., light text on dark backgrounds).\",\n        \"variant\": \"body\",\n        \"size\": \"medium\",\n        \"layout\": {\n          \"position\": \"below\",\n          \"alignment\": \"left\"\n        }\n      }\n    }\n  ]\n}",
+      "durationMs": 6838.448333,
+      "flaggedSignals": [],
+      "rawResponse": {
+        "theme": {
+          "primaryColor": "#1E90FF"
+        },
+        "components": [
+          {
+            "type": "text",
+            "props": {
+              "text": "UI Accent Color Mismatch Issue",
+              "variant": "heading",
+              "size": "large",
+              "layout": {
+                "position": "top",
+                "alignment": "center"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "props": {
+              "text": "The current UI preview displays buttons in royal-blue (#2563eb), but the user profile specifies an accent preference of #1E90FF (a blue). This mismatch causes the interface to not align with personalized preferences.",
+              "variant": "body",
+              "size": "medium",
+              "layout": {
+                "position": "below",
+                "alignment": "left"
+              }
+            }
+          },
+          {
+            "type": "statusCard",
+            "props": {
+              "title": "Accent Color Details",
+              "value": "Mismatch Detected",
+              "icon": "warning",
+              "tone": "caution",
+              "items": [
+                {
+                  "label": "Current Accent",
+                  "value": "#2563eb (Royal Blue)"
+                },
+                {
+                  "label": "Preferred Accent",
+                  "value": "#1E90FF (User Profile Blue)"
+                },
+                {
+                  "label": "Issue",
+                  "value": "Colors do not match, leading to inconsistency"
+                }
+              ],
+              "layout": {
+                "position": "below",
+                "alignment": "center"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "props": {
+              "text": "What needs to change: Update the theme.primaryColor in the UI configuration to '#1E90FF' to ensure buttons, toggles, and interactive elements use the correct accent. This aligns with household personalization preferences for better user experience and contrast.",
+              "variant": "body",
+              "size": "medium",
+              "layout": {
+                "position": "below",
+                "alignment": "left"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "props": {
+              "text": "Why: The user profile explicitly sets '#1E90FF' as the primary color for interface accents to personalize the UI. Using the wrong color reduces personalization and may affect readability if contrast is not maintained (e.g., light text on dark backgrounds).",
+              "variant": "body",
+              "size": "medium",
+              "layout": {
+                "position": "below",
+                "alignment": "left"
+              }
+            }
+          }
+        ]
+      },
+      "llmMeta": {
+        "provider": "openrouter",
+        "model": "x-ai/grok-code-fast-1",
+        "durationMs": 6818,
+        "usage": {
+          "prompt_tokens": 956,
+          "completion_tokens": 1058,
+          "total_tokens": 2014,
+          "cost": 0.00174364,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 192,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": null,
+            "upstream_inference_prompt_cost": 0.00015664,
+            "upstream_inference_completions_cost": 0.001587
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 495,
+            "image_tokens": 0
+          }
+        },
+        "timestamp": "2025-12-10T16:08:14.390Z"
+      },
+      "kbPayload": {
+        "prompt": "The current UI preview shows royal-blue buttons even though the user profile specifies an accent preference. Explain what needs to change and why.",
+        "schema": {
+          "name": "tablet-dashboard-ui",
+          "description": "Schema for the large-format tablet/laptop renderer. Supports explicit layout hints so the KB can describe a multi-column dashboard.",
+          "components": {
+            "text": {
+              "props": {
+                "text": "string",
+                "variant": "string",
+                "size": "string",
+                "layout": "layoutInstruction"
+              }
+            },
+            "button": {
+              "props": {
+                "label": "string",
+                "style": "string",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "toggle": {
+              "props": {
+                "label": "string",
+                "checked": "boolean",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "slider": {
+              "props": {
+                "label": "string",
+                "min": "number",
+                "max": "number",
+                "step": "number",
+                "value": "number",
+                "unit": "string",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "dropdown": {
+              "props": {
+                "label": "string",
+                "placeholder": "string",
+                "options": "array",
+                "value": "string",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "statusCard": {
+              "props": {
+                "title": "string",
+                "value": "string",
+                "icon": "string",
+                "tone": "string",
+                "items": "array",
+                "layout": "layoutInstruction"
+              }
+            },
+            "container": {
+              "props": {
+                "children": "array",
+                "layout": "string",
+                "placement": "layoutInstruction"
+              }
+            }
+          },
+          "theming": {
+            "description": "Supports `theme.primaryColor` and `theme.surfaceTint` for accent styling across cards and controls.",
+            "supportsPrimaryColor": true,
+            "defaultPrimaryColor": "#2563eb"
+          },
+          "context": {
+            "modalityPreference": "visual-large-format",
+            "defaultErgonomicsProfile": "cozy-desktop",
+            "supportedErgonomicsProfiles": [
+              {
+                "id": "cozy-desktop",
+                "label": "Cozy desktop",
+                "description": "Comfortable spacing for seated interaction on tablets or laptops."
+              },
+              {
+                "id": "information-dense",
+                "label": "Information dense",
+                "description": "Tighter spacing for dashboards that prioritize data density."
+              }
+            ]
+          },
+          "responseSchema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "Tablet/Laptop UI Schema",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "deviceId": {
+                "type": "string",
+                "description": "Identifier of the target tablet device that should render this UI definition."
+              },
+              "generatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Timestamp indicating when the UI was generated."
+              },
+              "context": {
+                "type": "object",
+                "description": "Arbitrary context metadata (thing references, device info, etc.).",
+                "additionalProperties": true
+              },
+              "theme": {
+                "type": "object",
+                "properties": {
+                  "primaryColor": {
+                    "type": "string",
+                    "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+                    "description": "Hexadecimal color value representing the preferred primary accent color."
+                  },
+                  "surfaceTint": {
+                    "type": "string",
+                    "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+                    "description": "Optional translucent wash to apply to containers."
+                  }
+                },
+                "additionalProperties": false
+              },
+              "components": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/definitions/component"
+                }
+              }
+            },
+            "required": [
+              "components"
+            ],
+            "definitions": {
+              "layoutInstruction": {
+                "type": "object",
+                "description": "Optional placement hint for the 12-column responsive grid rendered by the tablet device.",
+                "additionalProperties": false,
+                "properties": {
+                  "region": {
+                    "type": "string",
+                    "description": "Named region hint such as 'hero', 'sidebar', 'controls', or 'telemetry'."
+                  },
+                  "column": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "col": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "colSpan": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "span": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "row": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "rowSpan": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "x": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12,
+                    "description": "Alias for `column`."
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Alias for `row`."
+                  },
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12,
+                    "description": "Alias for `colSpan`."
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Alias for `rowSpan`."
+                  },
+                  "order": {
+                    "type": "integer",
+                    "description": "Optional ordering hint when auto-flow is used."
+                  },
+                  "align": {
+                    "type": "string",
+                    "enum": [
+                      "start",
+                      "center",
+                      "end",
+                      "stretch"
+                    ],
+                    "description": "Justify-self alignment inside the grid cell."
+                  },
+                  "justify": {
+                    "type": "string",
+                    "enum": [
+                      "start",
+                      "center",
+                      "end",
+                      "stretch"
+                    ],
+                    "description": "Align-self hint inside the grid cell."
+                  },
+                  "minHeight": {
+                    "type": "string",
+                    "description": "CSS size for minimum height (e.g., '180px')."
+                  },
+                  "maxHeight": {
+                    "type": "string",
+                    "description": "CSS size for maximum height."
+                  },
+                  "layer": {
+                    "type": "string",
+                    "enum": [
+                      "base",
+                      "overlay"
+                    ],
+                    "description": "Whether the element should float as an overlay card."
+                  }
+                }
+              },
+              "component": {
+                "oneOf": [
+                  {
+                    "$ref": "#/definitions/containerComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/textComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/buttonComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/toggleComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/sliderComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/dropdownComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/statusCardComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/toolCall"
+                  }
+                ]
+              },
+              "containerComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "container"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "description": "Layout strategy for child composition (grid, row, column).",
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/definitions/layoutInstruction"
+                      }
+                    ]
+                  },
+                  "placement": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Optional thing identifier that all nested children primarily control."
+                  },
+                  "children": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "$ref": "#/definitions/component"
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "children"
+                ]
+              },
+              "textComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "text"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "variant": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "tone": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Optional thing identifier this text references when showing state or instructions."
+                  }
+                },
+                "required": [
+                  "type",
+                  "text"
+                ]
+              },
+              "buttonComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "button"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string"
+                  },
+                  "style": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when executing the bound action."
+                  },
+                  "action": {
+                    "description": "Action payload or identifier to execute when the button is pressed.",
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label"
+                ]
+              },
+              "toggleComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "toggle"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "checked": {
+                    "type": "boolean"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when toggling."
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label"
+                ]
+              },
+              "sliderComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "slider"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "min": {
+                    "type": "number",
+                    "default": 0
+                  },
+                  "max": {
+                    "type": "number",
+                    "default": 100
+                  },
+                  "step": {
+                    "type": "number",
+                    "default": 1
+                  },
+                  "value": {
+                    "type": "number"
+                  },
+                  "unit": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when sending slider updates."
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label"
+                ]
+              },
+              "dropdownComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "dropdown"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "placeholder": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when selection changes."
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label",
+                  "options"
+                ]
+              },
+              "statusCardComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "statusCard"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string"
+                  },
+                  "tone": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier whose state this card summarizes."
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "title"
+                ]
+              },
+              "toolCall": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "toolCall"
+                  },
+                  "tool": {
+                    "type": "string"
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier providing context for the tool output."
+                  }
+                },
+                "required": [
+                  "type",
+                  "tool"
+                ]
+              }
+            }
+          }
+        },
+        "capabilityData": {
+          "currentAccent": "#2563eb",
+          "preferenceAccent": "#808080",
+          "issue": "mismatched accent"
+        },
+        "uiContext": {
+          "scenarioId": "theme-conflict-remediation",
+          "tags": [
+            "theme",
+            "compliance",
+            "audit"
+          ],
+          "inputs": {
+            "currentAccent": "#2563eb",
+            "preferenceAccent": "#808080",
+            "issue": "mismatched accent"
+          }
+        },
+        "deviceId": "device-tablet-eval",
+        "device": {
+          "id": "device-tablet-eval",
+          "deviceId": "device-tablet-eval",
+          "label": "Evaluation Tablet",
+          "type": "tablet",
+          "ergonomicsProfile": "cozy-desktop"
+        }
+      }
+    },
+    {
+      "scenarioId": "state-transition-guidance",
+      "name": "Hands state transition",
+      "mode": "kb",
+      "prompt": "You are a UI planning assistant for a tablet experience. Use the provided requirement documents to craft a response that explains what the tablet should render or say. Always cite the relevant document ids in parentheses when referencing a guideline.\n\nDocument modality-guideline-hands-occupied (source: safety-guidelines):\nWhen the user activity sensor reports the state \"hands-occupied\", prefer audio-first guidance. Provide spoken prompts and minimize the need for direct touch input. When the sensor reports \"hands-free\", present tactile controls such as buttons or toggles for the light switch.\n\nScenario prompt: The activity recognizer flips from \"hands-occupied\" to \"hands-free\" mid-task while the resident is adjusting lighting scenes. Describe how the UI should adapt.\n\nContext inputs:\n{\n  \"initialState\": \"hands-occupied\",\n  \"newState\": \"hands-free\",\n  \"task\": \"lighting scenes\"\n}\n\nRequired behaviors:\n- Start with audio-first instructions while the state is hands-occupied\n- Detect the transition and introduce tactile controls once hands-free is confirmed\n- Explain the transition to the user (e.g., toast or subtle banner)\n- Ensure theme accents still honor #808080\n\nAvoid the following failure modes:\n- Keeps only audio guidance even after hands-free\n- Changes theme colors during the transition\n\nRespond with two sections: (1) \"Plan\" — short paragraphs describing the approach, (2) \"Checks\" — bullet list referencing document ids.",
+      "answer": "{\n  \"theme\": {\n    \"primaryColor\": \"#1E90FF\"\n  },\n  \"root\": {\n    \"type\": \"container\",\n    \"props\": {\n      \"children\": [\n        {\n          \"type\": \"text\",\n          \"props\": {\n            \"text\": \"Activity State Changed: Now Hands-Free\",\n            \"variant\": \"heading\",\n            \"size\": \"large\",\n            \"layout\": \"center\"\n          }\n        },\n        {\n          \"type\": \"text\",\n          \"props\": {\n            \"text\": \"Switching from audio-first guidance to tactile controls for lighting scenes adjustment.\",\n            \"variant\": \"body\",\n            \"size\": \"medium\",\n            \"layout\": \"center\"\n          }\n        },\n        {\n          \"type\": \"statusCard\",\n          \"props\": {\n            \"title\": \"Current Task\",\n            \"value\": \"Adjusting Lighting Scenes\",\n            \"icon\": \"lightbulb\",\n            \"tone\": \"informative\",\n            \"items\": [\n              {\n                \"label\": \"State\",\n                \"value\": \"Hands-Free (Tactile Mode)\"\n              },\n              {\n                \"label\": \"Guidance\",\n                \"value\": \"Use buttons below to select scenes\"\n              }\n            ],\n            \"layout\": \"center\"\n          }\n        },\n        {\n          \"type\": \"container\",\n          \"props\": {\n            \"children\": [\n              {\n                \"type\": \"button\",\n                \"props\": {\n                  \"label\": \"Morning Scene\",\n                  \"style\": \"primary\",\n                  \"size\": \"large\",\n                  \"layout\": \"horizontal\",\n                  \"action\": null\n                }\n              },\n              {\n                \"type\": \"button\",\n                \"props\": {\n                  \"label\": \"Evening Scene\",\n                  \"style\": \"primary\",\n                  \"size\": \"large\",\n                  \"layout\": \"horizontal\",\n                  \"action\": null\n                }\n              },\n              {\n                \"type\": \"button\",\n                \"props\": {\n                  \"label\": \"Night Scene\",\n                  \"style\": \"primary\",\n                  \"size\": \"large\",\n                  \"layout\": \"horizontal\",\n                  \"action\": null\n                }\n              }\n            ],\n            \"layout\": \"horizontal\",\n            \"placement\": \"center\"\n          }\n        },\n        {\n          \"type\": \"text\",\n          \"props\": {\n            \"text\": \"Note: Tactile controls are now active. Touch to select a lighting scene.\",\n            \"variant\": \"caption\",\n            \"size\": \"small\",\n            \"layout\": \"center\"\n          }\n        }\n      ],\n      \"layout\": \"vertical\",\n      \"placement\": \"center\"\n    }\n  },\n  \"context\": {\n    \"defaultErgonomicsProfile\": \"standard\"\n  }\n}",
+      "durationMs": 7829.778249999996,
+      "flaggedSignals": [],
+      "rawResponse": {
+        "theme": {
+          "primaryColor": "#1E90FF"
+        },
+        "root": {
+          "type": "container",
+          "props": {
+            "children": [
+              {
+                "type": "text",
+                "props": {
+                  "text": "Activity State Changed: Now Hands-Free",
+                  "variant": "heading",
+                  "size": "large",
+                  "layout": "center"
+                }
+              },
+              {
+                "type": "text",
+                "props": {
+                  "text": "Switching from audio-first guidance to tactile controls for lighting scenes adjustment.",
+                  "variant": "body",
+                  "size": "medium",
+                  "layout": "center"
+                }
+              },
+              {
+                "type": "statusCard",
+                "props": {
+                  "title": "Current Task",
+                  "value": "Adjusting Lighting Scenes",
+                  "icon": "lightbulb",
+                  "tone": "informative",
+                  "items": [
+                    {
+                      "label": "State",
+                      "value": "Hands-Free (Tactile Mode)"
+                    },
+                    {
+                      "label": "Guidance",
+                      "value": "Use buttons below to select scenes"
+                    }
+                  ],
+                  "layout": "center"
+                }
+              },
+              {
+                "type": "container",
+                "props": {
+                  "children": [
+                    {
+                      "type": "button",
+                      "props": {
+                        "label": "Morning Scene",
+                        "style": "primary",
+                        "size": "large",
+                        "layout": "horizontal",
+                        "action": null
+                      }
+                    },
+                    {
+                      "type": "button",
+                      "props": {
+                        "label": "Evening Scene",
+                        "style": "primary",
+                        "size": "large",
+                        "layout": "horizontal",
+                        "action": null
+                      }
+                    },
+                    {
+                      "type": "button",
+                      "props": {
+                        "label": "Night Scene",
+                        "style": "primary",
+                        "size": "large",
+                        "layout": "horizontal",
+                        "action": null
+                      }
+                    }
+                  ],
+                  "layout": "horizontal",
+                  "placement": "center"
+                }
+              },
+              {
+                "type": "text",
+                "props": {
+                  "text": "Note: Tactile controls are now active. Touch to select a lighting scene.",
+                  "variant": "caption",
+                  "size": "small",
+                  "layout": "center"
+                }
+              }
+            ],
+            "layout": "vertical",
+            "placement": "center"
+          }
+        },
+        "context": {
+          "defaultErgonomicsProfile": "standard"
+        }
+      },
+      "llmMeta": {
+        "provider": "openrouter",
+        "model": "x-ai/grok-code-fast-1",
+        "durationMs": 7794,
+        "usage": {
+          "prompt_tokens": 960,
+          "completion_tokens": 1013,
+          "total_tokens": 1973,
+          "cost": 0.00167694,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 192,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": null,
+            "upstream_inference_prompt_cost": 0.00015744,
+            "upstream_inference_completions_cost": 0.0015195
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 450,
+            "image_tokens": 0
+          }
+        },
+        "timestamp": "2025-12-10T16:08:22.211Z"
+      },
+      "kbPayload": {
+        "prompt": "The activity recognizer flips from \"hands-occupied\" to \"hands-free\" mid-task while the resident is adjusting lighting scenes. Describe how the UI should adapt.",
+        "schema": {
+          "name": "tablet-dashboard-ui",
+          "description": "Schema for the large-format tablet/laptop renderer. Supports explicit layout hints so the KB can describe a multi-column dashboard.",
+          "components": {
+            "text": {
+              "props": {
+                "text": "string",
+                "variant": "string",
+                "size": "string",
+                "layout": "layoutInstruction"
+              }
+            },
+            "button": {
+              "props": {
+                "label": "string",
+                "style": "string",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "toggle": {
+              "props": {
+                "label": "string",
+                "checked": "boolean",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "slider": {
+              "props": {
+                "label": "string",
+                "min": "number",
+                "max": "number",
+                "step": "number",
+                "value": "number",
+                "unit": "string",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "dropdown": {
+              "props": {
+                "label": "string",
+                "placeholder": "string",
+                "options": "array",
+                "value": "string",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "statusCard": {
+              "props": {
+                "title": "string",
+                "value": "string",
+                "icon": "string",
+                "tone": "string",
+                "items": "array",
+                "layout": "layoutInstruction"
+              }
+            },
+            "container": {
+              "props": {
+                "children": "array",
+                "layout": "string",
+                "placement": "layoutInstruction"
+              }
+            }
+          },
+          "theming": {
+            "description": "Supports `theme.primaryColor` and `theme.surfaceTint` for accent styling across cards and controls.",
+            "supportsPrimaryColor": true,
+            "defaultPrimaryColor": "#2563eb"
+          },
+          "context": {
+            "modalityPreference": "visual-large-format",
+            "defaultErgonomicsProfile": "cozy-desktop",
+            "supportedErgonomicsProfiles": [
+              {
+                "id": "cozy-desktop",
+                "label": "Cozy desktop",
+                "description": "Comfortable spacing for seated interaction on tablets or laptops."
+              },
+              {
+                "id": "information-dense",
+                "label": "Information dense",
+                "description": "Tighter spacing for dashboards that prioritize data density."
+              }
+            ]
+          },
+          "responseSchema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "Tablet/Laptop UI Schema",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "deviceId": {
+                "type": "string",
+                "description": "Identifier of the target tablet device that should render this UI definition."
+              },
+              "generatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Timestamp indicating when the UI was generated."
+              },
+              "context": {
+                "type": "object",
+                "description": "Arbitrary context metadata (thing references, device info, etc.).",
+                "additionalProperties": true
+              },
+              "theme": {
+                "type": "object",
+                "properties": {
+                  "primaryColor": {
+                    "type": "string",
+                    "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+                    "description": "Hexadecimal color value representing the preferred primary accent color."
+                  },
+                  "surfaceTint": {
+                    "type": "string",
+                    "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+                    "description": "Optional translucent wash to apply to containers."
+                  }
+                },
+                "additionalProperties": false
+              },
+              "components": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/definitions/component"
+                }
+              }
+            },
+            "required": [
+              "components"
+            ],
+            "definitions": {
+              "layoutInstruction": {
+                "type": "object",
+                "description": "Optional placement hint for the 12-column responsive grid rendered by the tablet device.",
+                "additionalProperties": false,
+                "properties": {
+                  "region": {
+                    "type": "string",
+                    "description": "Named region hint such as 'hero', 'sidebar', 'controls', or 'telemetry'."
+                  },
+                  "column": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "col": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "colSpan": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "span": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "row": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "rowSpan": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "x": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12,
+                    "description": "Alias for `column`."
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Alias for `row`."
+                  },
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12,
+                    "description": "Alias for `colSpan`."
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Alias for `rowSpan`."
+                  },
+                  "order": {
+                    "type": "integer",
+                    "description": "Optional ordering hint when auto-flow is used."
+                  },
+                  "align": {
+                    "type": "string",
+                    "enum": [
+                      "start",
+                      "center",
+                      "end",
+                      "stretch"
+                    ],
+                    "description": "Justify-self alignment inside the grid cell."
+                  },
+                  "justify": {
+                    "type": "string",
+                    "enum": [
+                      "start",
+                      "center",
+                      "end",
+                      "stretch"
+                    ],
+                    "description": "Align-self hint inside the grid cell."
+                  },
+                  "minHeight": {
+                    "type": "string",
+                    "description": "CSS size for minimum height (e.g., '180px')."
+                  },
+                  "maxHeight": {
+                    "type": "string",
+                    "description": "CSS size for maximum height."
+                  },
+                  "layer": {
+                    "type": "string",
+                    "enum": [
+                      "base",
+                      "overlay"
+                    ],
+                    "description": "Whether the element should float as an overlay card."
+                  }
+                }
+              },
+              "component": {
+                "oneOf": [
+                  {
+                    "$ref": "#/definitions/containerComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/textComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/buttonComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/toggleComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/sliderComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/dropdownComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/statusCardComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/toolCall"
+                  }
+                ]
+              },
+              "containerComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "container"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "description": "Layout strategy for child composition (grid, row, column).",
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/definitions/layoutInstruction"
+                      }
+                    ]
+                  },
+                  "placement": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Optional thing identifier that all nested children primarily control."
+                  },
+                  "children": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "$ref": "#/definitions/component"
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "children"
+                ]
+              },
+              "textComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "text"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "variant": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "tone": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Optional thing identifier this text references when showing state or instructions."
+                  }
+                },
+                "required": [
+                  "type",
+                  "text"
+                ]
+              },
+              "buttonComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "button"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string"
+                  },
+                  "style": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when executing the bound action."
+                  },
+                  "action": {
+                    "description": "Action payload or identifier to execute when the button is pressed.",
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label"
+                ]
+              },
+              "toggleComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "toggle"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "checked": {
+                    "type": "boolean"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when toggling."
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label"
+                ]
+              },
+              "sliderComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "slider"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "min": {
+                    "type": "number",
+                    "default": 0
+                  },
+                  "max": {
+                    "type": "number",
+                    "default": 100
+                  },
+                  "step": {
+                    "type": "number",
+                    "default": 1
+                  },
+                  "value": {
+                    "type": "number"
+                  },
+                  "unit": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when sending slider updates."
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label"
+                ]
+              },
+              "dropdownComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "dropdown"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "placeholder": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when selection changes."
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label",
+                  "options"
+                ]
+              },
+              "statusCardComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "statusCard"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string"
+                  },
+                  "tone": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier whose state this card summarizes."
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "title"
+                ]
+              },
+              "toolCall": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "toolCall"
+                  },
+                  "tool": {
+                    "type": "string"
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier providing context for the tool output."
+                  }
+                },
+                "required": [
+                  "type",
+                  "tool"
+                ]
+              }
+            }
+          }
+        },
+        "capabilityData": {
+          "initialState": "hands-occupied",
+          "newState": "hands-free",
+          "task": "lighting scenes"
+        },
+        "uiContext": {
+          "scenarioId": "state-transition-guidance",
+          "tags": [
+            "modality",
+            "state-change",
+            "fallthrough"
+          ],
+          "inputs": {
+            "initialState": "hands-occupied",
+            "newState": "hands-free",
+            "task": "lighting scenes"
+          }
+        },
+        "deviceId": "device-tablet-eval",
+        "device": {
+          "id": "device-tablet-eval",
+          "deviceId": "device-tablet-eval",
+          "label": "Evaluation Tablet",
+          "type": "tablet",
+          "ergonomicsProfile": "cozy-desktop"
+        }
+      }
+    },
+    {
+      "scenarioId": "audit-checklist",
+      "name": "KB compliance audit",
+      "mode": "kb",
+      "prompt": "You are a UI planning assistant for a tablet experience. Use the provided requirement documents to craft a response that explains what the tablet should render or say. Always cite the relevant document ids in parentheses when referencing a guideline.\n\nDocument modality-guideline-hands-occupied (source: safety-guidelines):\nWhen the user activity sensor reports the state \"hands-occupied\", prefer audio-first guidance. Provide spoken prompts and minimize the need for direct touch input. When the sensor reports \"hands-free\", present tactile controls such as buttons or toggles for the light switch.\n\nDocument user-preference-primary-color (source: user-profile):\nThe primary household preference for interface accents is the color \"#1E90FF\" (a blue). Whenever possible, set the UI theme primary color to this value so buttons, toggles, and other interactive highlights align with the user preference. Ensure sufficient contrast by using light text on dark backgrounds.\n\nScenario prompt: Produce a checklist the QA team can use to verify that a generated tablet layout respects both the modality guideline and the accent preference.\n\nContext inputs:\n{\n  \"artifact\": \"tablet layout spec\",\n  \"checks\": [\n    \"modality\",\n    \"theme\"\n  ]\n}\n\nRequired behaviors:\n- List at least three modality checks (hands-occupied audio, hands-free tactile, transitions)\n- List at least two theme checks (accent equals #808080, light text over accent)\n- Tie every checklist item to the relevant document id\n\nAvoid the following failure modes:\n- Checklist omits either modality or theme\n- No references back to KB documents\n\nRespond with two sections: (1) \"Plan\" — short paragraphs describing the approach, (2) \"Checks\" — bullet list referencing document ids.",
+      "answer": "{\n  \"theme\": {\n    \"primaryColor\": \"#1E90FF\"\n  },\n  \"ui\": {\n    \"component\": \"container\",\n    \"props\": {\n      \"children\": [\n        {\n          \"component\": \"text\",\n          \"props\": {\n            \"text\": \"QA Checklist for Tablet Layout Verification\",\n            \"variant\": \"heading\",\n            \"size\": \"large\",\n            \"layout\": {\n              \"position\": \"top\",\n              \"margin\": \"16px\"\n            }\n          }\n        },\n        {\n          \"component\": \"text\",\n          \"props\": {\n            \"text\": \"This checklist ensures the generated tablet layout respects the modality guideline and accent preference based on user profiles and safety guidelines.\",\n            \"variant\": \"body\",\n            \"size\": \"medium\",\n            \"layout\": {\n              \"position\": \"top\",\n              \"margin\": \"16px\"\n            }\n          }\n        },\n        {\n          \"component\": \"text\",\n          \"props\": {\n            \"text\": \"Modality Guideline Checks:\",\n            \"variant\": \"heading\",\n            \"size\": \"medium\",\n            \"layout\": {\n              \"position\": \"top\",\n              \"margin\": \"16px 16px 8px\"\n            }\n          }\n        },\n        {\n          \"component\": \"text\",\n          \"props\": {\n            \"text\": \"1. When user activity sensor reports 'hands-occupied', does the layout prioritize audio-first guidance (e.g., spoken prompts) and minimize direct touch input requirements?\",\n            \"variant\": \"body\",\n            \"size\": \"small\",\n            \"layout\": {\n              \"position\": \"top\",\n              \"margin\": \"8px 16px\"\n            }\n          }\n        },\n        {\n          \"component\": \"text\",\n          \"props\": {\n            \"text\": \"2. When user activity sensor reports 'hands-free', does the layout provide tactile controls (e.g., buttons or toggles) for interactive elements like light switches?\",\n            \"variant\": \"body\",\n            \"size\": \"small\",\n            \"layout\": {\n              \"position\": \"top\",\n              \"margin\": \"8px 16px\"\n            }\n          }\n        },\n        {\n          \"component\": \"text\",\n          \"props\": {\n            \"text\": \"Accent Preference Checks:\",\n            \"variant\": \"heading\",\n            \"size\": \"medium\",\n            \"layout\": {\n              \"position\": \"top\",\n              \"margin\": \"16px 16px 8px\"\n            }\n          }\n        },\n        {\n          \"component\": \"text\",\n          \"props\": {\n            \"text\": \"3. Is the UI theme's primary color set to '#1E90FF' (blue) for buttons, toggles, and interactive highlights?\",\n            \"variant\": \"body\",\n            \"size\": \"small\",\n            \"layout\": {\n              \"position\": \"top\",\n              \"margin\": \"8px 16px\"\n            }\n          }\n        },\n        {\n          \"component\": \"text\",\n          \"props\": {\n            \"text\": \"4. Does the layout ensure sufficient contrast by using light text on dark backgrounds where primary color accents are applied?\",\n            \"variant\": \"body\",\n            \"size\": \"small\",\n            \"layout\": {\n              \"position\": \"top\",\n              \"margin\": \"8px 16px\"\n            }\n          }\n        },\n        {\n          \"component\": \"text\",\n          \"props\": {\n            \"text\": \"5. Are all interactive elements (e.g., buttons, toggles) highlighted or styled using the primary color '#1E90FF' to align with household preferences?\",\n            \"variant\": \"body\",\n            \"size\": \"small\",\n            \"layout\": {\n              \"position\": \"top\",\n              \"margin\": \"8px 16px\"\n            }\n          }\n        },\n        {\n          \"component\": \"text\",\n          \"props\": {\n            \"text\": \"General Verification Notes:\",\n            \"variant\": \"heading\",\n            \"size\": \"medium\",\n            \"layout\": {\n              \"position\": \"top\",\n              \"margin\": \"16px 16px 8px\"\n            }\n          }\n        },\n        {\n          \"component\": \"text\",\n          \"props\": {\n            \"text\": \"- Verify on a tablet device with ergonomics profile 'cozy-desktop' for appropriate sizing and layout.\",\n            \"variant\": \"body\",\n            \"size\": \"small\",\n            \"layout\": {\n              \"position\": \"top\",\n              \"margin\": \"8px 16px\"\n            }\n          }\n        },\n        {\n          \"component\": \"text\",\n          \"props\": {\n            \"text\": \"- Test in both 'hands-occupied' and 'hands-free' simulation modes to confirm modality adaptations.\",\n            \"variant\": \"body\",\n            \"size\": \"small\",\n            \"layout\": {\n              \"position\": \"top\",\n              \"margin\": \"8px 16px\"\n            }\n          }\n        },\n        {\n          \"component\": \"text\",\n          \"props\": {\n            \"text\": \"- Use color contrast tools to measure readability (aim for WCAG AA compliance with light text on dark backgrounds).\",\n            \"variant\": \"body\",\n            \"size\": \"small\",\n            \"layout\": {\n              \"position\": \"top\",\n              \"margin\": \"8px 16px\"\n            }\n          }\n        }\n      ],\n      \"layout\": \"vertical\",\n      \"placement\": {\n        \"align\": \"left\",\n        \"padding\": \"16px\"\n      }\n    }\n  }\n}",
+      "durationMs": 11548.092042000004,
+      "flaggedSignals": [],
+      "rawResponse": {
+        "theme": {
+          "primaryColor": "#1E90FF"
+        },
+        "ui": {
+          "component": "container",
+          "props": {
+            "children": [
+              {
+                "component": "text",
+                "props": {
+                  "text": "QA Checklist for Tablet Layout Verification",
+                  "variant": "heading",
+                  "size": "large",
+                  "layout": {
+                    "position": "top",
+                    "margin": "16px"
+                  }
+                }
+              },
+              {
+                "component": "text",
+                "props": {
+                  "text": "This checklist ensures the generated tablet layout respects the modality guideline and accent preference based on user profiles and safety guidelines.",
+                  "variant": "body",
+                  "size": "medium",
+                  "layout": {
+                    "position": "top",
+                    "margin": "16px"
+                  }
+                }
+              },
+              {
+                "component": "text",
+                "props": {
+                  "text": "Modality Guideline Checks:",
+                  "variant": "heading",
+                  "size": "medium",
+                  "layout": {
+                    "position": "top",
+                    "margin": "16px 16px 8px"
+                  }
+                }
+              },
+              {
+                "component": "text",
+                "props": {
+                  "text": "1. When user activity sensor reports 'hands-occupied', does the layout prioritize audio-first guidance (e.g., spoken prompts) and minimize direct touch input requirements?",
+                  "variant": "body",
+                  "size": "small",
+                  "layout": {
+                    "position": "top",
+                    "margin": "8px 16px"
+                  }
+                }
+              },
+              {
+                "component": "text",
+                "props": {
+                  "text": "2. When user activity sensor reports 'hands-free', does the layout provide tactile controls (e.g., buttons or toggles) for interactive elements like light switches?",
+                  "variant": "body",
+                  "size": "small",
+                  "layout": {
+                    "position": "top",
+                    "margin": "8px 16px"
+                  }
+                }
+              },
+              {
+                "component": "text",
+                "props": {
+                  "text": "Accent Preference Checks:",
+                  "variant": "heading",
+                  "size": "medium",
+                  "layout": {
+                    "position": "top",
+                    "margin": "16px 16px 8px"
+                  }
+                }
+              },
+              {
+                "component": "text",
+                "props": {
+                  "text": "3. Is the UI theme's primary color set to '#1E90FF' (blue) for buttons, toggles, and interactive highlights?",
+                  "variant": "body",
+                  "size": "small",
+                  "layout": {
+                    "position": "top",
+                    "margin": "8px 16px"
+                  }
+                }
+              },
+              {
+                "component": "text",
+                "props": {
+                  "text": "4. Does the layout ensure sufficient contrast by using light text on dark backgrounds where primary color accents are applied?",
+                  "variant": "body",
+                  "size": "small",
+                  "layout": {
+                    "position": "top",
+                    "margin": "8px 16px"
+                  }
+                }
+              },
+              {
+                "component": "text",
+                "props": {
+                  "text": "5. Are all interactive elements (e.g., buttons, toggles) highlighted or styled using the primary color '#1E90FF' to align with household preferences?",
+                  "variant": "body",
+                  "size": "small",
+                  "layout": {
+                    "position": "top",
+                    "margin": "8px 16px"
+                  }
+                }
+              },
+              {
+                "component": "text",
+                "props": {
+                  "text": "General Verification Notes:",
+                  "variant": "heading",
+                  "size": "medium",
+                  "layout": {
+                    "position": "top",
+                    "margin": "16px 16px 8px"
+                  }
+                }
+              },
+              {
+                "component": "text",
+                "props": {
+                  "text": "- Verify on a tablet device with ergonomics profile 'cozy-desktop' for appropriate sizing and layout.",
+                  "variant": "body",
+                  "size": "small",
+                  "layout": {
+                    "position": "top",
+                    "margin": "8px 16px"
+                  }
+                }
+              },
+              {
+                "component": "text",
+                "props": {
+                  "text": "- Test in both 'hands-occupied' and 'hands-free' simulation modes to confirm modality adaptations.",
+                  "variant": "body",
+                  "size": "small",
+                  "layout": {
+                    "position": "top",
+                    "margin": "8px 16px"
+                  }
+                }
+              },
+              {
+                "component": "text",
+                "props": {
+                  "text": "- Use color contrast tools to measure readability (aim for WCAG AA compliance with light text on dark backgrounds).",
+                  "variant": "body",
+                  "size": "small",
+                  "layout": {
+                    "position": "top",
+                    "margin": "8px 16px"
+                  }
+                }
+              }
+            ],
+            "layout": "vertical",
+            "placement": {
+              "align": "left",
+              "padding": "16px"
+            }
+          }
+        }
+      },
+      "llmMeta": {
+        "provider": "openrouter",
+        "model": "x-ai/grok-code-fast-1",
+        "durationMs": 11526,
+        "usage": {
+          "prompt_tokens": 952,
+          "completion_tokens": 1741,
+          "total_tokens": 2693,
+          "cost": 0.00276734,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 192,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": null,
+            "upstream_inference_prompt_cost": 0.00015584,
+            "upstream_inference_completions_cost": 0.0026115
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 601,
+            "image_tokens": 0
+          }
+        },
+        "timestamp": "2025-12-10T16:08:33.774Z"
+      },
+      "kbPayload": {
+        "prompt": "Produce a checklist the QA team can use to verify that a generated tablet layout respects both the modality guideline and the accent preference.",
+        "schema": {
+          "name": "tablet-dashboard-ui",
+          "description": "Schema for the large-format tablet/laptop renderer. Supports explicit layout hints so the KB can describe a multi-column dashboard.",
+          "components": {
+            "text": {
+              "props": {
+                "text": "string",
+                "variant": "string",
+                "size": "string",
+                "layout": "layoutInstruction"
+              }
+            },
+            "button": {
+              "props": {
+                "label": "string",
+                "style": "string",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "toggle": {
+              "props": {
+                "label": "string",
+                "checked": "boolean",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "slider": {
+              "props": {
+                "label": "string",
+                "min": "number",
+                "max": "number",
+                "step": "number",
+                "value": "number",
+                "unit": "string",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "dropdown": {
+              "props": {
+                "label": "string",
+                "placeholder": "string",
+                "options": "array",
+                "value": "string",
+                "size": "string",
+                "layout": "layoutInstruction",
+                "action": "object"
+              }
+            },
+            "statusCard": {
+              "props": {
+                "title": "string",
+                "value": "string",
+                "icon": "string",
+                "tone": "string",
+                "items": "array",
+                "layout": "layoutInstruction"
+              }
+            },
+            "container": {
+              "props": {
+                "children": "array",
+                "layout": "string",
+                "placement": "layoutInstruction"
+              }
+            }
+          },
+          "theming": {
+            "description": "Supports `theme.primaryColor` and `theme.surfaceTint` for accent styling across cards and controls.",
+            "supportsPrimaryColor": true,
+            "defaultPrimaryColor": "#2563eb"
+          },
+          "context": {
+            "modalityPreference": "visual-large-format",
+            "defaultErgonomicsProfile": "cozy-desktop",
+            "supportedErgonomicsProfiles": [
+              {
+                "id": "cozy-desktop",
+                "label": "Cozy desktop",
+                "description": "Comfortable spacing for seated interaction on tablets or laptops."
+              },
+              {
+                "id": "information-dense",
+                "label": "Information dense",
+                "description": "Tighter spacing for dashboards that prioritize data density."
+              }
+            ]
+          },
+          "responseSchema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "Tablet/Laptop UI Schema",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "deviceId": {
+                "type": "string",
+                "description": "Identifier of the target tablet device that should render this UI definition."
+              },
+              "generatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Timestamp indicating when the UI was generated."
+              },
+              "context": {
+                "type": "object",
+                "description": "Arbitrary context metadata (thing references, device info, etc.).",
+                "additionalProperties": true
+              },
+              "theme": {
+                "type": "object",
+                "properties": {
+                  "primaryColor": {
+                    "type": "string",
+                    "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+                    "description": "Hexadecimal color value representing the preferred primary accent color."
+                  },
+                  "surfaceTint": {
+                    "type": "string",
+                    "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+                    "description": "Optional translucent wash to apply to containers."
+                  }
+                },
+                "additionalProperties": false
+              },
+              "components": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/definitions/component"
+                }
+              }
+            },
+            "required": [
+              "components"
+            ],
+            "definitions": {
+              "layoutInstruction": {
+                "type": "object",
+                "description": "Optional placement hint for the 12-column responsive grid rendered by the tablet device.",
+                "additionalProperties": false,
+                "properties": {
+                  "region": {
+                    "type": "string",
+                    "description": "Named region hint such as 'hero', 'sidebar', 'controls', or 'telemetry'."
+                  },
+                  "column": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "col": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "colSpan": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "span": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "row": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "rowSpan": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "x": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12,
+                    "description": "Alias for `column`."
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Alias for `row`."
+                  },
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12,
+                    "description": "Alias for `colSpan`."
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Alias for `rowSpan`."
+                  },
+                  "order": {
+                    "type": "integer",
+                    "description": "Optional ordering hint when auto-flow is used."
+                  },
+                  "align": {
+                    "type": "string",
+                    "enum": [
+                      "start",
+                      "center",
+                      "end",
+                      "stretch"
+                    ],
+                    "description": "Justify-self alignment inside the grid cell."
+                  },
+                  "justify": {
+                    "type": "string",
+                    "enum": [
+                      "start",
+                      "center",
+                      "end",
+                      "stretch"
+                    ],
+                    "description": "Align-self hint inside the grid cell."
+                  },
+                  "minHeight": {
+                    "type": "string",
+                    "description": "CSS size for minimum height (e.g., '180px')."
+                  },
+                  "maxHeight": {
+                    "type": "string",
+                    "description": "CSS size for maximum height."
+                  },
+                  "layer": {
+                    "type": "string",
+                    "enum": [
+                      "base",
+                      "overlay"
+                    ],
+                    "description": "Whether the element should float as an overlay card."
+                  }
+                }
+              },
+              "component": {
+                "oneOf": [
+                  {
+                    "$ref": "#/definitions/containerComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/textComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/buttonComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/toggleComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/sliderComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/dropdownComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/statusCardComponent"
+                  },
+                  {
+                    "$ref": "#/definitions/toolCall"
+                  }
+                ]
+              },
+              "containerComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "container"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "description": "Layout strategy for child composition (grid, row, column).",
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/definitions/layoutInstruction"
+                      }
+                    ]
+                  },
+                  "placement": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Optional thing identifier that all nested children primarily control."
+                  },
+                  "children": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "$ref": "#/definitions/component"
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "children"
+                ]
+              },
+              "textComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "text"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "variant": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "tone": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Optional thing identifier this text references when showing state or instructions."
+                  }
+                },
+                "required": [
+                  "type",
+                  "text"
+                ]
+              },
+              "buttonComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "button"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string"
+                  },
+                  "style": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when executing the bound action."
+                  },
+                  "action": {
+                    "description": "Action payload or identifier to execute when the button is pressed.",
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label"
+                ]
+              },
+              "toggleComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "toggle"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "checked": {
+                    "type": "boolean"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when toggling."
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label"
+                ]
+              },
+              "sliderComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "slider"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "min": {
+                    "type": "number",
+                    "default": 0
+                  },
+                  "max": {
+                    "type": "number",
+                    "default": 100
+                  },
+                  "step": {
+                    "type": "number",
+                    "default": 1
+                  },
+                  "value": {
+                    "type": "number"
+                  },
+                  "unit": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when sending slider updates."
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label"
+                ]
+              },
+              "dropdownComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "dropdown"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "placeholder": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier to target when selection changes."
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "label",
+                  "options"
+                ]
+              },
+              "statusCardComponent": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "statusCard"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string"
+                  },
+                  "tone": {
+                    "type": "string"
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier whose state this card summarizes."
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "title"
+                ]
+              },
+              "toolCall": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "const": "toolCall"
+                  },
+                  "tool": {
+                    "type": "string"
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "layout": {
+                    "$ref": "#/definitions/layoutInstruction"
+                  },
+                  "thingId": {
+                    "type": "string",
+                    "description": "Thing identifier providing context for the tool output."
+                  }
+                },
+                "required": [
+                  "type",
+                  "tool"
+                ]
+              }
+            }
+          }
+        },
+        "capabilityData": {
+          "artifact": "tablet layout spec",
+          "checks": [
+            "modality",
+            "theme"
+          ]
+        },
+        "uiContext": {
+          "scenarioId": "audit-checklist",
+          "tags": [
+            "audit",
+            "theme",
+            "modality"
+          ],
+          "inputs": {
+            "artifact": "tablet layout spec",
+            "checks": [
+              "modality",
+              "theme"
+            ]
+          }
+        },
+        "deviceId": "device-tablet-eval",
+        "device": {
+          "id": "device-tablet-eval",
+          "deviceId": "device-tablet-eval",
+          "label": "Evaluation Tablet",
+          "type": "tablet",
+          "ergonomicsProfile": "cozy-desktop"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "mode": "kb",
+    "total": 6,
+    "successes": 6,
+    "warnings": 0,
+    "errors": 0,
+    "avgDurationMs": 13659.7,
+    "llmStats": {
+      "calls": 6,
+      "totalPromptTokens": 5737,
+      "totalCompletionTokens": 7326,
+      "totalTokens": 13063,
+      "totalReasoningTokens": 4281,
+      "avgTokensPerCall": 2177.2,
+      "totalLlmDurationMs": 81787,
+      "avgLlmDurationMs": 13631.2,
+      "providers": {
+        "openrouter": 6
+      },
+      "models": {
+        "x-ai/grok-code-fast-1": 6
+      }
+    }
+  }
+}
