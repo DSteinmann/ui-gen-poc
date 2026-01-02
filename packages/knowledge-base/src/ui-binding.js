@@ -1,4 +1,3 @@
-
 const deriveThingIdFromActionId = (actionId = '') => {
   if (typeof actionId !== 'string') {
     return null;
@@ -8,126 +7,6 @@ const deriveThingIdFromActionId = (actionId = '') => {
     return null;
   }
   return actionId.slice(0, delimiterIndex) || null;
-};
-
-const INTERACTIVE_COMPONENT_TYPES = new Set(['button', 'toggle', 'slider', 'dropdown']);
-
-const normalizeLabelString = (value) => {
-  if (typeof value !== 'string') {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-};
-
-const tokenizeLabel = (label = '') => {
-  if (!label) {
-    return [];
-  }
-  return label
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter(Boolean);
-};
-
-const ACTION_KEYWORD_RULES = [
-  { regex: /\bturn\s*on\b|\bpower\s*on\b|\benable\b|\bstart\b/, fragment: 'turnon' },
-  { regex: /\bturn\s*off\b|\bpower\s*off\b|\bdisable\b|\bstop\b/, fragment: 'turnoff' },
-  { regex: /\btoggle\b|\bswitch\b/, fragment: 'toggle' },
-  { regex: /\bdrive\b|\bwheel\b|\bmove\b|\btractor\b/, fragment: 'setwheelcontrol' },
-];
-
-const actionKeywordCache = new WeakMap();
-
-const getActionKeywords = (action) => {
-  if (!action || typeof action !== 'object') {
-    return new Set();
-  }
-
-  if (actionKeywordCache.has(action)) {
-    return actionKeywordCache.get(action);
-  }
-
-  const sources = [
-    action.id,
-    action.name,
-    action.title,
-    ...(Array.isArray(action.metadata?.intentAliases) ? action.metadata.intentAliases : []),
-  ];
-
-  const tokens = new Set();
-  sources.forEach((source) => {
-    if (typeof source !== 'string') {
-      return;
-    }
-    source
-      .toLowerCase()
-      .split(/[^a-z0-9]+/)
-      .filter(Boolean)
-      .forEach((token) => tokens.add(token));
-  });
-
-  actionKeywordCache.set(action, tokens);
-  return tokens;
-};
-
-const includesActionFragment = (action, fragment) => {
-  if (!action || !fragment) {
-    return false;
-  }
-
-  const normalizedFragment = fragment.toLowerCase();
-  const comparisonFields = [
-    action.id,
-    action.name,
-    action.title,
-    ...(Array.isArray(action.metadata?.intentAliases) ? action.metadata.intentAliases : []),
-  ];
-
-  return comparisonFields.some((field) =>
-    typeof field === 'string' && field.toLowerCase().includes(normalizedFragment)
-  );
-};
-
-const matchActionByHint = (hint, actions = []) => {
-  if (typeof hint !== 'string') {
-    return null;
-  }
-  const normalized = hint.trim().toLowerCase();
-  if (!normalized) {
-    return null;
-  }
-  return actions.find((action) => includesActionFragment(action, normalized)) || null;
-};
-
-const scoreActionCandidate = ({ action, labelLower, labelTokens, componentType }) => {
-  if (!action || !labelLower) {
-    return 0;
-  }
-
-  let score = 0;
-  ACTION_KEYWORD_RULES.forEach((rule) => {
-    if (rule.regex.test(labelLower) && includesActionFragment(action, rule.fragment)) {
-      score += 5;
-    }
-  });
-
-  const actionKeywords = getActionKeywords(action);
-  labelTokens.forEach((token) => {
-    if (actionKeywords.has(token)) {
-      score += 1;
-    }
-  });
-
-  const actionIdLower = typeof action.id === 'string' ? action.id.toLowerCase() : '';
-  if (componentType === 'toggle' && actionIdLower.includes('toggle')) {
-    score += 2;
-  }
-  if (componentType === 'slider' && actionIdLower.includes('wheelcontrol')) {
-    score += 2;
-  }
-
-  return score;
 };
 
 const cloneActionDescriptor = (action = {}) => {
@@ -206,75 +85,49 @@ const traverseComponents = (node, visitor) => {
   return node;
 };
 
-const inferActionForComponent = ({ component, props, type, candidateActions, fallbackThingId }) => {
+const resolveActionForComponent = ({ component, props, candidateActions, fallbackThingId }) => {
   if (!Array.isArray(candidateActions) || candidateActions.length === 0) {
     return null;
   }
 
-  const explicitActionId = [props.actionId, component.actionId, props.targetActionId, component.targetActionId]
-    .find((value) => typeof value === 'string' && value.trim().length > 0);
+  // Only look for explicit action references, relying on the LLM to pick the right one.
+  const explicitActionId = [
+    props.actionId, 
+    component.actionId, 
+    props.targetActionId, 
+    component.targetActionId,
+    // If the LLM generates a full action object directly but missing transport, we handle it elsewhere,
+    // but here we check if a property like 'action' is a string ID.
+    typeof props.action === 'string' ? props.action : null
+  ].find((value) => typeof value === 'string' && value.trim().length > 0);
 
   if (explicitActionId) {
     const normalized = explicitActionId.trim();
+    // Try exact match or simple case-insensitive match
     const matching = candidateActions.find((action) => action.id === normalized)
       || candidateActions.find((action) => typeof action.id === 'string' && action.id.toLowerCase() === normalized.toLowerCase());
+    
     if (matching) {
       return matching;
     }
+    
+    // If not found in candidates, construct a minimal descriptor if we can infer thingId
     return {
       id: normalized,
       thingId: fallbackThingId || deriveThingIdFromActionId(normalized),
     };
   }
 
-  const hintMatch =
-    matchActionByHint(props.intent, candidateActions)
-    || matchActionByHint(component.intent, candidateActions)
-    || matchActionByHint(props.command, candidateActions)
-    || matchActionByHint(component.command, candidateActions);
-
-  if (hintMatch) {
-    return hintMatch;
-  }
-
-  const label = normalizeLabelString(
-    props.label
-      || props.text
-      || props.title
-      || props.name
-      || component.label
-      || component.text
-      || component.title,
-  );
-
-  const labelLower = label ? label.toLowerCase() : '';
-  const labelTokens = tokenizeLabel(labelLower);
-
-  if (labelLower) {
-    let bestAction = null;
-    let bestScore = 0;
-    candidateActions.forEach((action) => {
-      const score = scoreActionCandidate({ action, labelLower, labelTokens, componentType: type });
-      if (score > bestScore) {
-        bestScore = score;
-        bestAction = action;
-      }
-    });
-    if (bestAction && bestScore > 0) {
-      return bestAction;
-    }
-  }
-
-  if (candidateActions.length === 1) {
-    return candidateActions[0];
-  }
-
   return null;
 };
 
 export const ensureActionBindings = (uiDefinition, { thingActions = [], fallbackThingId = null } = {}) => {
+  if (!uiDefinition || typeof uiDefinition !== 'object') {
+    return uiDefinition;
+  }
+
   const actions = Array.isArray(thingActions) ? thingActions.filter((action) => action && action.id) : [];
-  if (!uiDefinition || actions.length === 0) {
+  if (actions.length === 0) {
     return uiDefinition;
   }
 
@@ -291,18 +144,18 @@ export const ensureActionBindings = (uiDefinition, { thingActions = [], fallback
   });
 
   traverseComponents(uiDefinition, (component) => {
-    const type = component.component || component.type;
-    if (!type || !INTERACTIVE_COMPONENT_TYPES.has(type)) {
-      return;
-    }
-
+    // Check any component for action bindings, regardless of type
     const props = component.props && typeof component.props === 'object' ? component.props : component;
 
-    if (props.action) {
-      if (!component.action) {
-        component.action = props.action;
-      }
-      return;
+    // If an action object is already present and fully formed, we trust it or just patch thingId
+    if (props.action && typeof props.action === 'object') {
+        if (!props.action.thingId && fallbackThingId) {
+            props.action.thingId = fallbackThingId;
+        }
+        if (!component.action) {
+            component.action = props.action;
+        }
+        return;
     }
 
     const resolvedThingId =
@@ -316,26 +169,22 @@ export const ensureActionBindings = (uiDefinition, { thingActions = [], fallback
       ? actionsByThingId.get(resolvedThingId)
       : actions;
 
-    const inferred = inferActionForComponent({
+    const inferred = resolveActionForComponent({
       component,
       props,
-      type,
       candidateActions,
       fallbackThingId: resolvedThingId || fallbackThingId,
     });
 
-    if (!inferred) {
-      console.warn(`[UiBinding] Interactive component '${props.label || type}' is missing an action binding.`);
-      return;
-    }
-
-    const descriptor = cloneActionDescriptor(inferred) || inferred;
-    props.action = descriptor;
-    if (!component.action) {
-      component.action = descriptor;
-    }
-    if (!props.thingId && descriptor?.thingId) {
-      props.thingId = descriptor.thingId;
+    if (inferred) {
+      const descriptor = cloneActionDescriptor(inferred) || inferred;
+      props.action = descriptor;
+      if (!component.action) {
+        component.action = descriptor;
+      }
+      if (!props.thingId && descriptor?.thingId) {
+        props.thingId = descriptor.thingId;
+      }
     }
   });
 

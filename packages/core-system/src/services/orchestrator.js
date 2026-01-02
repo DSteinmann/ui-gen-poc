@@ -12,7 +12,6 @@ import { dispatchUiToClients } from '../transport/websocket.js';
 import { KNOWLEDGE_BASE_URL, FALLBACK_PROMPT, DEFAULT_RESPONSE_SCHEMA_PATH } from '../config.js';
 import { composeUrl, nowIsoString } from '../utils.js';
 import { ensureThingActions } from '../../action-registry.js';
-import { attachThingActionsToUi } from '../../ui-action-augmenter.js';
 
 let defaultResponseSchema;
 try {
@@ -667,11 +666,6 @@ export const generateUiForDevice = async ({
       ],
     };
   }
-
-  generatedUi = attachThingActionsToUi(generatedUi, {
-    thingActions: normalizedThingActions,
-    defaultThingId: targetDevice?.thingId || resolvedThingDescription?.id || null,
-  });
 
   if (broadcast) {
     dispatchUiToClients(targetDeviceId, generatedUi);
