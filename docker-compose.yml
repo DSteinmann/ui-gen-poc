@@ -9,7 +9,7 @@ services:
       CORE_SYSTEM_PUBLIC_URL: http://core-system:3001
       SERVICE_REGISTRY_PUBLIC_URL: http://core-system:3000
       SERVICE_REGISTRY_URL: http://core-system:3000
-      KNOWLEDGE_BASE_URL: http://knowledge-base:3005
+      KNOWLEDGE_BASE_URL: http://knowledge-base:3010
       BIND_ADDRESS: 0.0.0.0
     ports:
       - "3001:3001"
@@ -27,8 +27,8 @@ services:
       context: .
       dockerfile: packages/knowledge-base/Dockerfile
     environment:
-      KNOWLEDGE_BASE_PORT: 3005
-      KNOWLEDGE_BASE_PUBLIC_URL: http://knowledge-base:3005
+      KNOWLEDGE_BASE_PORT: 3010
+      KNOWLEDGE_BASE_PUBLIC_URL: http://knowledge-base:3010
       SERVICE_REGISTRY_URL: http://core-system:3000
       LLM_ENDPOINT: ${LLM_ENDPOINT:-http://192.168.1.73:1234/v1/chat/completions}
       LLM_MODEL: ${LLM_MODEL:-gemma 3b}
@@ -41,9 +41,9 @@ services:
       KNOWLEDGE_BASE_DATA_FILE: /data/kb-data.json
       BIND_ADDRESS: 0.0.0.0
     ports:
-      - "3005:3005"
+      - "3010:3010"
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3005/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3010/health"]
       interval: 10s
       timeout: 5s
       retries: 5
