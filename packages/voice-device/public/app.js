@@ -23,6 +23,14 @@ let lastAutoListenAttempt = 0;
 let userGrantedMic = false;
 let unloadHandlerRegistered = false;
 let currentPromptSuggestions = [];
+let hasInteracted = false;
+let lastSpokenInstruction = '';
+let isAwaitingFirstInteraction = false;
+
+let resolveFirstUiUpdate;
+const firstUiUpdatePromise = new Promise((resolve) => {
+  resolveFirstUiUpdate = resolve;
+});
 
 const AUTO_LISTEN_COOLDOWN_MS = 8000;
 const RECONNECT_DELAY_MS = 4000;
@@ -37,6 +45,23 @@ const dockerInternalHostnames = new Set([
   '0.0.0.0',
 ]);
 
+const speak = (text) => {
+  if (!('speechSynthesis' in window)) {
+    console.warn('Speech synthesis not supported in this browser.');
+    return;
+  }
+  if (!text) {
+    return;
+  }
+  try {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = config?.recognitionLanguage || 'en-US';
+    window.speechSynthesis.speak(utterance);
+  } catch (error) {
+    console.error('Error occured during speech synthesis:', error);
+  }
+};
+
 const appendLog = (entry) => {
   const li = document.createElement('li');
   const header = document.createElement('strong');
@@ -46,8 +71,10 @@ const appendLog = (entry) => {
   li.appendChild(header);
   li.appendChild(document.createElement('br'));
   li.appendChild(detail);
-  logList.prepend(li);
+  logList.prepend(li); 
 };
+
+
 
 const setListeningState = (listening) => {
   isListening = listening;
@@ -142,6 +169,10 @@ const initialiseRecognition = () => {
   instance.onend = () => setListeningState(false);
   instance.onerror = (event) => {
     setListeningState(false);
+    if (event.error === 'no-speech') {
+      speak('Please try again.');
+      return;
+    }
     if (event.error === 'not-allowed' && !userGrantedMic) {
       appendLog({
         header: 'Microphone permission blocked',
@@ -170,8 +201,20 @@ const initialiseRecognition = () => {
 };
 
 const attachEventListeners = () => {
-  startBtn.addEventListener('click', () => {
+  startBtn.addEventListener('click', async () => {
     if (recognition && !isListening) {
+      if (!hasInteracted) {
+        isAwaitingFirstInteraction = true;
+        startBtn.disabled = true;
+        startBtn.textContent = 'Receiving instructions...';
+        await firstUiUpdatePromise;
+        startBtn.textContent = 'Start Listening';
+
+        const initialGreeting = lastSpokenInstruction || `You can say things like: ${config.sampleCommands.join(', or ')}.`;
+        speak(initialGreeting);
+        hasInteracted = true;
+        isAwaitingFirstInteraction = false;
+      }
       recognition.start();
     }
   });
@@ -267,7 +310,7 @@ const resolveWebsocketUrl = () => {
 };
 
 const maybeAutoStartListening = (reason) => {
-  if (!recognition || isListening) {
+  if (!recognition || isListening || isAwaitingFirstInteraction) {
     return;
   }
 
@@ -316,6 +359,17 @@ const handleUiUpdate = (payload) => {
 
   const suggestions = extractPromptSuggestions(payload.ui);
   renderPromptSuggestions(suggestions);
+
+  const components = payload.ui?.props?.children || [];
+  const textComponent = components.find((c) => c.component === 'text');
+  if (textComponent?.props?.content) {
+    lastSpokenInstruction = textComponent.props.content;
+  }
+
+  if (resolveFirstUiUpdate) {
+    resolveFirstUiUpdate();
+    resolveFirstUiUpdate = null;
+  }
 
   maybeAutoStartListening('Core system routed the latest UI to this voice device.');
 };
